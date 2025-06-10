@@ -1,0 +1,27 @@
+version: '3'
+services:
+  {$project_name}:
+    image: {$project_name}
+    container_name: {$project_name}
+    ports:
+      - "2112:80"
+    environment:
+      - ES_INSTANCE_NAME={$project_name} development container
+      - ES_MONGO_HOST={$project_name}-mongo
+    volumes:
+    - ./logs:/var/log/{$project_name}
+    depends_on:
+      - {$project_name}-mongo
+
+  {$project_name}-mongo:
+    image: mongo
+    container_name: {$project_name}-mongo
+    volumes:
+      - mongodb:/data/db
+      - mongodb_config:/data/configdb      
+    ports:
+      - "27017:27017"
+
+volumes:
+    mongodb:
+    mongodb_config:

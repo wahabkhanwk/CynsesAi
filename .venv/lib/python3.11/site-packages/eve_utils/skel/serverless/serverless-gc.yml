@@ -1,0 +1,49 @@
+service: {$project_name}
+
+frameworkVersion: ">=1.1.0"
+
+provider:
+  name: google
+  project: {$project_name}           # google account project name
+  credentials: ~/.gcloud/keyfile.json  # must be absolute path
+
+  stage: dev
+  runtime: python3.9
+  environment:
+    ES_INSTANCE_NAME: "{$project_name} development serverless (google)"
+    ES_LOG_TO_FOLDER: Disabled
+    ES_SEND_ERROR_EMAILS: Disabled
+    ## NEED MONGO CONNECTION DETAILS HERE
+
+
+plugins:
+  - serverless-wsgi
+  - serverless-python-requirements
+#  - serverless-google-cloudfunctions
+
+package:
+  patterns:
+    - '!_env.conf'
+    - '!node_modules/**'
+    - '!.serverless/**'
+    - '!.serverless_plugins/**'
+    - '!venv/**'
+    - '!**/*.pyc'
+
+functions:
+  api:
+    handler: wsgi_handler.handler
+    events:
+      - http: ANY /
+      - http: ANY /{proxy+}
+
+
+custom:
+  wsgi:
+    app: serverless.app
+    packRequirements: false
+  pythonRequirements:
+    dockerizePip: non-linux
+
+
+configValidationMode: error

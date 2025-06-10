@@ -1,0 +1,11 @@
+#separator \x09
+#set_separator	,
+#empty_field	(empty)
+#unset_field	-
+#path	ssl
+#open	2025-06-09-23-56-28
+#fields	ts	uid	id.orig_h	id.orig_p	id.resp_h	id.resp_p	version	cipher	curve	server_name	resumed	last_alert	next_protocol	established	ssl_history	cert_chain_fps	client_cert_chain_fps	sni_matches_cert
+#types	time	string	addr	port	addr	port	string	string	string	string	bool	string	string	bool	string	vector[string]	vector[string]	bool
+1738354989.692137	CXJrj81n1T3571MhB1	10.1.31.101	49739	104.21.80.1	443	TLSv10	TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA	x25519	reallyfreegeoip.org	F	-	-	T	CsxknGIti	61bf4e5b83dc6cd22aaaac0669769fc23a9b401fdc15e908dc24afa4c433678f,1dfc1605fbad358d8bc844f76d15203fac9ca5c1a79fd4857ffaf2864fbebf96,76b27b80a58027dc3cf1da68dac17010ed93997d0b603e2fadbe85012493b5a7	(empty)	T
+1738354992.312286	C0QmcX2kIRp1xQy8t8	10.1.31.101	49740	149.154.167.220	443	TLSv12	TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256	x25519	api.telegram.org	F	-	-	T	CsxknGIti	4de6145b34cafc6b36204a853415fc3855cec5ee673e3008a49558be35b5f876,973a41276ffd01e027a2aad49e34c37846d3e976ff6a620b6712e33832041aa6,3a2fbe92891e57fe05d57087f48e730f17e5a5f53ef403d618e5b74d7a7e6ecb,c3846bf24b9e93ca64274c0ec67c1ecc5e024ffcacd2d74019350e81fe546ae4	(empty)	T
+#close	2025-06-09-23-56-28

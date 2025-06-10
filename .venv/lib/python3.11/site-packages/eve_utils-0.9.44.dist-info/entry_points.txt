@@ -1,0 +1,3 @@
+[console_scripts]
+eu = eve_utils.commands:initialize
+eve-utils = eve_utils.commands:initialize

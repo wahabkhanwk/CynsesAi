@@ -1,0 +1,55 @@
+# Compiled python modules.
+*.pyc
+
+pyvenv.cfg
+
+# Setuptools distribution folder.
+dist/
+build/
+
+# Python egg metadata, regenerated from source files by setuptools.
+*.egg-info
+*.egg
+
+
+!/src/{$project_name}/.idea
+/src/{$project_name}/.idea/*
+!/src/{$project_name}/.idea/icon.png
+!/src/{$project_name}/.idea/icon_dark.png
+
+.vscode/
+venv/
+node_modules/
+__pycache__/
+logs/
+.serverless/
+
+*.py[cod]
+*$py.class
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+
+# Mac/OSX
+.DS_Store
+
+# Windows
+Thumbs.db
+
+~$*
+_env.conf
+
+.history
+*.zip
+
+# src data
+src/data/*
+*.tgz
+

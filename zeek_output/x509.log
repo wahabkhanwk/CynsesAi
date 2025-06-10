@@ -1,0 +1,16 @@
+#separator \x09
+#set_separator	,
+#empty_field	(empty)
+#unset_field	-
+#path	x509
+#open	2025-06-09-23-56-28
+#fields	ts	fingerprint	certificate.version	certificate.serial	certificate.subject	certificate.issuer	certificate.not_valid_before	certificate.not_valid_after	certificate.key_alg	certificate.sig_alg	certificate.key_type	certificate.key_length	certificate.exponent	certificate.curve	san.dns	san.uri	san.email	san.ip	basic_constraints.ca	basic_constraints.path_len	host_cert	client_cert
+#types	time	string	count	string	string	string	time	time	string	string	string	count	string	string	vector[string]	vector[string]	vector[string]	vector[addr]	bool	count	bool	bool
+1738354989.752072	61bf4e5b83dc6cd22aaaac0669769fc23a9b401fdc15e908dc24afa4c433678f	3	43B2A4258D191A510D6B44B695FEFAB2	CN=reallyfreegeoip.org	CN=WE1,O=Google Trust Services,C=US	1735419735.000000	1743199181.000000	id-ecPublicKey	ecdsa-with-SHA256	ecdsa	256	-	prime256v1	reallyfreegeoip.org,*.reallyfreegeoip.org	-	-	-	F	-	T	F
+1738354989.752072	1dfc1605fbad358d8bc844f76d15203fac9ca5c1a79fd4857ffaf2864fbebf96	3	7FF31977972C224A76155D13B6D685E3	CN=WE1,O=Google Trust Services,C=US	CN=GTS Root R4,O=Google Trust Services LLC,C=US	1702440000.000000	1866272400.000000	id-ecPublicKey	ecdsa-with-SHA384	ecdsa	256	-	prime256v1	-	-	-	-	T	0	F	F
+1738354989.752072	76b27b80a58027dc3cf1da68dac17010ed93997d0b603e2fadbe85012493b5a7	3	7FE530BF331343BEDD821610493D8A1B	CN=GTS Root R4,O=Google Trust Services LLC,C=US	CN=GlobalSign Root CA,OU=Root CA,O=GlobalSign nv-sa,C=BE	1700001801.000000	1832612442.000000	id-ecPublicKey	sha256WithRSAEncryption	ecdsa	384	-	secp384r1	-	-	-	-	T	-	F	F
+1738354992.449273	4de6145b34cafc6b36204a853415fc3855cec5ee673e3008a49558be35b5f876	3	DF94C51B5A76E3CB	CN=api.telegram.org	CN=Go Daddy Secure Certificate Authority - G2,OU=http://certs.godaddy.com/repository/,O=GoDaddy.com\\, Inc.,L=Scottsdale,ST=Arizona,C=US	1711267728.000000	1745568528.000000	rsaEncryption	sha256WithRSAEncryption	rsa	2048	65537	-	api.telegram.org,www.api.telegram.org	-	-	-	F	-	T	F
+1738354992.449273	973a41276ffd01e027a2aad49e34c37846d3e976ff6a620b6712e33832041aa6	3	07	CN=Go Daddy Secure Certificate Authority - G2,OU=http://certs.godaddy.com/repository/,O=GoDaddy.com\\, Inc.,L=Scottsdale,ST=Arizona,C=US	CN=Go Daddy Root Certificate Authority - G2,O=GoDaddy.com\\, Inc.,L=Scottsdale,ST=Arizona,C=US	1304388000.000000	1935540000.000000	rsaEncryption	sha256WithRSAEncryption	rsa	2048	65537	-	-	-	-	-	T	-	F	F
+1738354992.449273	3a2fbe92891e57fe05d57087f48e730f17e5a5f53ef403d618e5b74d7a7e6ecb	3	1BE715	CN=Go Daddy Root Certificate Authority - G2,O=GoDaddy.com\\, Inc.,L=Scottsdale,ST=Arizona,C=US	OU=Go Daddy Class 2 Certification Authority,O=The Go Daddy Group\\, Inc.,C=US	1388541600.000000	1937872800.000000	rsaEncryption	sha256WithRSAEncryption	rsa	2048	65537	-	-	-	-	-	T	-	F	F
+1738354992.449273	c3846bf24b9e93ca64274c0ec67c1ecc5e024ffcacd2d74019350e81fe546ae4	3	00	OU=Go Daddy Class 2 Certification Authority,O=The Go Daddy Group\\, Inc.,C=US	OU=Go Daddy Class 2 Certification Authority,O=The Go Daddy Group\\, Inc.,C=US	1088510780.000000	2035195580.000000	rsaEncryption	sha1WithRSAEncryption	rsa	2048	3	-	-	-	-	-	T	-	F	F
+#close	2025-06-09-23-56-28

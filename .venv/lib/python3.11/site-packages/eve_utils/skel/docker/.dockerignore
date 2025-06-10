@@ -1,0 +1,12 @@
+Dockerfile
+.dockerignore
+docker-compose.yml
+**/node_modules
+**/*.pyproj
+**/*.pyc
+README.md
+**/*.pdb
+**/*.log
+**/.pylintrc
+**/_env.conf
+**/*.db
