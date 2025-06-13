@@ -1,3 +1,9 @@
+from modules.suricata_parser import run_suricata
+from modules.zeek import run_zeek
+from modules.threat_intel import real_threat_intel
+from modules.protocol_analysis import analyze_protocols
+from modules.anomaly_detection import detect_anomalies
+from modules.report_generation import generate_report
 import os
 import json
 import subprocess
@@ -11,14 +17,19 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import WebBaseLoader
 from langchain_ollama import OllamaLLM, OllamaEmbeddings
 from pathlib import Path
-from suricata_parser import run_suricata
+#from suricata_parser import run_suricata
 from langchain_core.messages import BaseMessage
+import requests
+from diskcache import Cache
 
 os.environ["USER_AGENT"] = "CynsesAI-PCAP-Analyzer/1.0"
 
+# Initialize diskcache Cache
+cache = Cache("./cache_dir")
+
 # Configuration
 USE_OLLAMA = False  # Set to False for API-based LLM
-PCAP_FILE = "/Users/macbook/Desktop/CynsesAI/sample.pcap"
+PCAP_FILE = "/Users/macbook/Desktop/CynsesAI/GoldenEye.pcap"  # Path to your PCAP file
 SURICATA_DOCS_URL = "https://suricata.readthedocs.io/en/latest/"
 
 # Define the analysis state
@@ -47,84 +58,9 @@ else:
         openai_api_key=CHUTES_API_KEY,
         openai_api_base=CHUTES_API_BASE,
         temperature=0.7,
-        max_tokens=1024,
+        max_tokens=4096,
     )
     embeddings = None  
-# ------------------------
-# Tool Wrapper Functions
-# ------------------------
-
-
-def run_suricata(pcap_path: str) -> List[Dict]:
-    """Run Suricata on PCAP file and parse results"""
-    output_dir = "suricata_output"
-    os.makedirs(output_dir, exist_ok=True)
-
-# Paths - update these as needed
-    SURICATA_CONFIG = "/opt/homebrew/etc/suricata/suricata.yaml"
-    PCAP_PATH = "/Users/macbook/Desktop/CynsesAI/sample.pcap"
-    OUTPUT_DIR = "suricata_output"
-
-# Execute Suricata without the --set parameter
-    subprocess.run([
-        "suricata",
-        "-c", SURICATA_CONFIG,
-        "-r", PCAP_PATH,
-        "-l", OUTPUT_DIR
-        ], check=True)
-    # Parse results
-    events = []
-    eve_path = os.path.join(output_dir, "eve.json")
-    if os.path.exists(eve_path):
-        with open(eve_path) as f:
-            for line in f:
-                events.append(json.loads(line))
-    return events
-
-def run_zeek(pcap_path: str) -> Dict:
-    """Run Zeek on PCAP file and parse logs"""
-    output_dir = "zeek_output"
-    output_path = Path(output_dir)
-    output_path.mkdir(exist_ok=True)
-    
-    # Execute Zeek with proper error handling
-    try:
-        result = subprocess.run(
-            ["zeek", "-C", "-r", pcap_path, f"Log::default_logdir={output_path.absolute()}"],
-            check=True,
-            capture_output=True,
-            text=True
-        )
-        # Print warnings but continue
-        if result.stderr:
-            print(f"⚠️ Zeek warnings: {result.stderr}")
-    except subprocess.CalledProcessError as e:
-        print(f"❌ Zeek failed: {e.stderr}")
-        return {"error": f"Zeek execution failed: {e.stderr}"}
-    
-    # Parse logs with error handling
-    logs = {}
-    for log_file in output_path.glob("*.log"):
-        try:
-            with log_file.open() as f:
-                logs[log_file.name] = f.readlines()
-        except Exception as e:
-            print(f"❌ Error reading {log_file}: {str(e)}")
-            logs[log_file.name] = [f"Error reading log: {str(e)}"]
-    
-    return logs
-
-def get_threat_intel(ip: str) -> Dict:
-    """Get threat intelligence for an IP (simulated)"""
-    # In a real implementation, integrate with VirusTotal, AlienVault, etc.
-    return {
-        "ip": ip,
-        "reputation": "suspicious" if ip.startswith("185.") else "clean",
-        "geo_data": {
-            "country": "Unknown",
-            "asn": "AS12345"
-        }
-    }
 
 # ------------------------
 # RAG Setup - Suricata Documentation
@@ -148,6 +84,7 @@ def setup_suricata_rag() -> Chroma:
 # Initialize RAG vector store
 suricata_vectorstore = setup_suricata_rag()
 
+@cache.memoize()
 def retrieve_suricata_docs(query: str) -> str:
     """Retrieve relevant Suricata documentation"""
     docs = suricata_vectorstore.similarity_search(query, k=3)
@@ -332,7 +269,7 @@ def threat_intel_node(state: AnalysisState) -> Dict:
             ips.add(event["dest_ip"])
     
     # Get threat intel for each IP
-    threat_data = {ip: get_threat_intel(ip) for ip in ips}
+    threat_data = {ip: real_threat_intel(ip) for ip in ips}
     
     # Add LLM-enhanced analysis
     prompt = f"""
@@ -416,15 +353,39 @@ def visualization_node(state: AnalysisState) -> Dict:
             "entities": ["src_ips", "dest_ips", "malicious_domains"]
         }
     }
+def summarize_suricata_events(events):
+    """Summarize Suricata events for the report."""
+    if not events:
+        return "No significant Suricata events detected."
+    try:
+        return "\n".join(
+            f"- [{e.get('timestamp', '')}] {e.get('event_type', '')}: {e.get('alert', {}).get('signature', str(e)[:100])}"
+            for e in events
+        )
+    except Exception:
+        return str(events)[:3000]
+
+def summarize_anomalies(anomalies):
+    """Summarize anomalies for the report."""
+    if not anomalies:
+        return "No anomalies detected."
+    try:
+        return "\n".join(
+            f"- Severity {a.get('severity', '?')}: {a.get('description', str(a)[:100])}"
+            for a in anomalies
+        )
+    except Exception:
+        return str(anomalies)[:2000]
+
 def report_generation_node(state: AnalysisState) -> Dict:
     """Node 8: Generate final report"""
     print("📝 Generating comprehensive report...")
-    
-    # Safely extract content from all LLM results
-    suricata_summary = json.dumps(state['suricata_events'][:3])[:1000]
+
+    # Safely summarize inputs
+    suricata_summary = summarize_suricata_events(state['suricata_events'][:3000])
     protocol_analysis = extract_content(state['protocol_analysis']['llm_analysis'])[:1000]
     threat_intel_analysis = extract_content(state['threat_intel']['llm_analysis'])[:1000]
-    anomalies = json.dumps(state['anomalies'])[:2000]
+    anomalies = summarize_anomalies(state['anomalies'])
     visualization_plan = extract_content(state['visualization_data']['plan'])[:2000]
     rag_context = extract_content(state['rag_context'])[:2000]
 
@@ -443,9 +404,6 @@ def report_generation_node(state: AnalysisState) -> Dict:
     Anomalies Detected:
     {anomalies}
 
-    Visualization Plan:
-    {visualization_plan}
-
     Suricata Documentation Context:
     {rag_context}
 
@@ -456,13 +414,15 @@ def report_generation_node(state: AnalysisState) -> Dict:
     - Recommended Actions
     - Visualization Strategy
     """
-    
-    raw_report = llm.invoke(prompt)
-    report = extract_content(raw_report)
 
-    return {
-        "report": report
-    }
+    try:
+        raw_report = llm.invoke(prompt)
+        report = extract_content(raw_report)
+    except Exception as e:
+        print(f"[ERROR] Report generation failed: {e}")
+        report = "⚠️ Error: Full report could not be generated."
+
+    return {"report": report}
 # ------------------------
 # Build the LangGraph
 # ------------------------
@@ -475,17 +435,20 @@ workflow = StateGraph(AnalysisState)
 workflow.add_node("init", initialize_analysis)
 workflow.add_node("suricata", run_suricata_node)
 workflow.add_node("zeek", run_zeek_node)
+workflow.add_node("merge_results", lambda state: state)  # Simple merge node
 workflow.add_node("protocols", protocol_analysis_node)
 workflow.add_node("threat_intel_node", threat_intel_node)
 workflow.add_node("anomalies_detection_node", anomaly_detection_node)
 workflow.add_node("visualization", visualization_node)
 workflow.add_node("report_generation_node", report_generation_node)
 
-# Set up edges
+# Set up edges for parallel execution and merging
 workflow.set_entry_point("init")
 workflow.add_edge("init", "suricata")
-workflow.add_edge("suricata", "zeek")
-workflow.add_edge("zeek", "protocols")
+workflow.add_edge("init", "zeek")
+workflow.add_edge("suricata", "merge_results")
+workflow.add_edge("zeek", "merge_results")
+workflow.add_edge("merge_results", "protocols")
 workflow.add_edge("protocols", "threat_intel_node")
 workflow.add_edge("threat_intel_node", "anomalies_detection_node")
 workflow.add_edge("anomalies_detection_node", "visualization")
