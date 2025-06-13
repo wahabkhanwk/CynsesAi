@@ -1,0 +1,15 @@
+#separator \x09
+#set_separator	,
+#empty_field	(empty)
+#unset_field	-
+#path	conn
+#open	2025-06-13-12-05-24
+#fields	ts	uid	id.orig_h	id.orig_p	id.resp_h	id.resp_p	proto	service	duration	orig_bytes	resp_bytes	conn_state	local_orig	local_resp	missed_bytes	history	orig_pkts	orig_ip_bytes	resp_pkts	resp_ip_bytes	tunnel_parents	ip_proto
+#types	time	string	addr	port	addr	port	enum	string	interval	count	count	string	bool	bool	count	string	count	count	count	count	set[string]	count
+1738354998.559455	CJLvHE143SbhJc8NS	10.1.31.101	49741	208.91.198.143	587	tcp	smtp	3.400400	1562	429	SF	T	F	0	ShAdDafF	16	2214	22	1313	-	6
+1738354989.004716	Cch5vC43qdvCytICH	10.1.31.101	64819	10.1.31.1	53	udp	dns	9.553797	149	453	SF	T	T	0	Dd	4	261	4	565	-	17
+1738354989.072693	CxFzMF4C0dhIEN7Yyh	10.1.31.101	49738	193.122.6.168	80	tcp	http	102.961001	1294	2720	SF	T	F	0	ShADadfF	23	2226	23	3644	-	6
+1738354989.619708	CCHWPD2sCb6p3OAJY3	10.1.31.101	49739	104.21.80.1	443	tcp	ssl	102.682233	1352	14483	SF	T	F	0	ShADadFf	25	2364	26	15527	-	6
+1738354992.174772	CDfxSj4ZohnOTEJw34	10.1.31.101	49740	149.154.167.220	443	tcp	ssl	12.310260	62686	8147	S1	T	F	0	ShADad	54	64858	57	10431	-	6
+1738355001.960224	C76ck312zm9V4rAeWk	10.1.31.101	49742	208.91.198.143	587	tcp	smtp	96.650631	100267	429	SF	T	F	0	ShAdDafF	83	103599	89	3993	-	6
+#close	2025-06-13-12-05-24

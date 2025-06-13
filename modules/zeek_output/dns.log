@@ -1,0 +1,13 @@
+#separator \x09
+#set_separator	,
+#empty_field	(empty)
+#unset_field	-
+#path	dns
+#open	2025-06-13-12-05-24
+#fields	ts	uid	id.orig_h	id.orig_p	id.resp_h	id.resp_p	proto	trans_id	rtt	query	qclass	qclass_name	qtype	qtype_name	rcode	rcode_name	AA	TC	RD	RA	Z	answers	TTLs	rejected
+#types	time	string	addr	port	addr	port	enum	count	interval	string	count	string	count	string	count	string	bool	bool	bool	bool	count	vector[string]	vector[interval]	bool
+1738354989.004716	Cch5vC43qdvCytICH	10.1.31.101	64819	10.1.31.1	53	udp	5511	0.056228	checkip.dyndns.org	1	C_INTERNET	1	A	0	NOERROR	F	F	T	T	0	checkip.dyndns.com,193.122.6.168,193.122.130.0,132.226.8.169,132.226.247.73,158.101.44.242	5.000000,5.000000,5.000000,5.000000,5.000000,5.000000	F
+1738354989.559010	Cch5vC43qdvCytICH	10.1.31.101	64819	10.1.31.1	53	udp	43321	0.059757	reallyfreegeoip.org	1	C_INTERNET	1	A	0	NOERROR	F	F	T	T	0	104.21.80.1,104.21.48.1,104.21.64.1,104.21.112.1,104.21.96.1,104.21.32.1,104.21.16.1	5.000000,5.000000,5.000000,5.000000,5.000000,5.000000,5.000000	F
+1738354992.111372	Cch5vC43qdvCytICH	10.1.31.101	64819	10.1.31.1	53	udp	33298	0.062626	api.telegram.org	1	C_INTERNET	1	A	0	NOERROR	F	F	T	T	0	149.154.167.220	5.000000	F
+1738354998.475156	Cch5vC43qdvCytICH	10.1.31.101	64819	10.1.31.1	53	udp	34591	0.083357	us2.smtp.mailhostbox.com	1	C_INTERNET	1	A	0	NOERROR	F	F	T	T	0	208.91.198.143,208.91.199.223,208.91.199.224,208.91.199.225	5.000000,5.000000,5.000000,5.000000	F
+#close	2025-06-13-12-05-24

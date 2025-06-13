@@ -1,0 +1,19 @@
+#separator \x09
+#set_separator	,
+#empty_field	(empty)
+#unset_field	-
+#path	http
+#open	2025-06-13-12-05-24
+#fields	ts	uid	id.orig_h	id.orig_p	id.resp_h	id.resp_p	trans_depth	method	host	uri	referrer	version	user_agent	origin	request_body_len	response_body_len	status_code	status_msg	info_code	info_msg	tags	username	password	proxied	orig_fuids	orig_filenames	orig_mime_types	resp_fuids	resp_filenames	resp_mime_types
+#types	time	string	addr	port	addr	port	count	string	string	string	string	string	string	string	count	count	count	string	count	string	set[enum]	string	string	set[string]	vector[string]	vector[string]	vector[string]	vector[string]	vector[string]	vector[string]
+1738354989.208119	CxFzMF4C0dhIEN7Yyh	10.1.31.101	49738	193.122.6.168	80	1	GET	checkip.dyndns.org	/	-	1.1	Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.2; .NET CLR1.0.3705;)	-	0	103	200	OK	-	-	(empty)	-	-	-	-	-	-	FaGoIZ2cqwEH0cV1v9	-	text/html
+1738354989.352513	CxFzMF4C0dhIEN7Yyh	10.1.31.101	49738	193.122.6.168	80	2	GET	checkip.dyndns.org	/	-	1.1	Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.2; .NET CLR1.0.3705;)	-	0	103	200	OK	-	-	(empty)	-	-	-	-	-	-	FHThR43OPh4w7SqPd4	-	text/html
+1738354990.385955	CxFzMF4C0dhIEN7Yyh	10.1.31.101	49738	193.122.6.168	80	3	GET	checkip.dyndns.org	/	-	1.1	Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.2; .NET CLR1.0.3705;)	-	0	103	200	OK	-	-	(empty)	-	-	-	-	-	-	FjW9bl2ACi8NW84i75	-	text/html
+1738354990.599131	CxFzMF4C0dhIEN7Yyh	10.1.31.101	49738	193.122.6.168	80	4	GET	checkip.dyndns.org	/	-	1.1	Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.2; .NET CLR1.0.3705;)	-	0	103	200	OK	-	-	(empty)	-	-	-	-	-	-	FTdE2X1Tp3yFpj2Hrk	-	text/html
+1738354990.827291	CxFzMF4C0dhIEN7Yyh	10.1.31.101	49738	193.122.6.168	80	5	GET	checkip.dyndns.org	/	-	1.1	Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.2; .NET CLR1.0.3705;)	-	0	103	200	OK	-	-	(empty)	-	-	-	-	-	-	Fa5a5x21QuOGibn5Vd	-	text/html
+1738354991.032654	CxFzMF4C0dhIEN7Yyh	10.1.31.101	49738	193.122.6.168	80	6	GET	checkip.dyndns.org	/	-	1.1	Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.2; .NET CLR1.0.3705;)	-	0	103	200	OK	-	-	(empty)	-	-	-	-	-	-	FKqf7r3z9BVoACs44	-	text/html
+1738354991.240227	CxFzMF4C0dhIEN7Yyh	10.1.31.101	49738	193.122.6.168	80	7	GET	checkip.dyndns.org	/	-	1.1	Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.2; .NET CLR1.0.3705;)	-	0	103	200	OK	-	-	(empty)	-	-	-	-	-	-	F5oDvy3GfenK6IilW6	-	text/html
+1738354991.452447	CxFzMF4C0dhIEN7Yyh	10.1.31.101	49738	193.122.6.168	80	8	GET	checkip.dyndns.org	/	-	1.1	Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.2; .NET CLR1.0.3705;)	-	0	103	200	OK	-	-	(empty)	-	-	-	-	-	-	FFtT6norBtzFEsnsk	-	text/html
+1738354991.665549	CxFzMF4C0dhIEN7Yyh	10.1.31.101	49738	193.122.6.168	80	9	GET	checkip.dyndns.org	/	-	1.1	Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.2; .NET CLR1.0.3705;)	-	0	103	200	OK	-	-	(empty)	-	-	-	-	-	-	FtY52g3oLTKIcEb6Qg	-	text/html
+1738354991.878258	CxFzMF4C0dhIEN7Yyh	10.1.31.101	49738	193.122.6.168	80	10	GET	checkip.dyndns.org	/	-	1.1	Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.2; .NET CLR1.0.3705;)	-	0	103	200	OK	-	-	(empty)	-	-	-	-	-	-	FT5L4iQZn4w5wkO56	-	text/html
+#close	2025-06-13-12-05-24

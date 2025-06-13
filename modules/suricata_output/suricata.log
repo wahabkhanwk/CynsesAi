@@ -1,0 +1,19 @@
+[259 - Suricata-Main] 2025-06-11 00:03:31 Notice: suricata: This is Suricata version 7.0.10 RELEASE running in USER mode
+[259 - Suricata-Main] 2025-06-11 00:03:31 Info: cpu: CPUs/cores online: 8
+[259 - Suricata-Main] 2025-06-11 00:03:31 Info: suricata: Setting engine mode to IDS mode by default
+[259 - Suricata-Main] 2025-06-11 00:03:31 Info: exception-policy: master exception-policy set to: auto
+[259 - Suricata-Main] 2025-06-11 00:03:31 Info: logopenfile: fast output device (regular) initialized: fast.log
+[259 - Suricata-Main] 2025-06-11 00:03:31 Info: logopenfile: eve-log output device (regular) initialized: eve.json
+[259 - Suricata-Main] 2025-06-11 00:03:31 Info: logopenfile: stats output device (regular) initialized: stats.log
+[259 - Suricata-Main] 2025-06-11 00:03:31 Info: detect-fast-pattern: fast_pattern is ineffective with base64_data
+[259 - Suricata-Main] 2025-06-11 00:03:31 Info: detect-fast-pattern: fast_pattern is ineffective with base64_data
+[259 - Suricata-Main] 2025-06-11 00:03:31 Info: detect: 1 rule files processed. 42580 rules successfully loaded, 0 rules failed, 0
+[259 - Suricata-Main] 2025-06-11 00:03:31 Info: threshold-config: Threshold config parsed: 0 rule(s) found
+[259 - Suricata-Main] 2025-06-11 00:03:31 Info: detect: 42583 signatures processed. 1270 are IP-only rules, 4333 are inspecting packet payload, 36763 inspect application layer, 109 are decoder event only
+[3331 - RX#01] 2025-06-11 00:03:34 Info: pcap: Starting file run for /Users/macbook/Desktop/CynsesAI/sample.pcap
+[259 - Suricata-Main] 2025-06-11 00:03:34 Notice: threads: Threads created -> RX: 1 W: 8 FM: 1 FR: 1   Engine started.
+[3331 - RX#01] 2025-06-11 00:03:34 Info: pcap: pcap file /Users/macbook/Desktop/CynsesAI/sample.pcap end of file reached (pcap err code 0)
+[259 - Suricata-Main] 2025-06-11 00:03:34 Notice: suricata: Signal Received.  Stopping engine.
+[259 - Suricata-Main] 2025-06-11 00:03:34 Info: suricata: time elapsed 0.064s
+[3331 - RX#01] 2025-06-11 00:03:34 Notice: pcap: read 1 file, 426 packets, 216959 bytes
+[259 - Suricata-Main] 2025-06-11 00:03:34 Info: counters: Alerts: 20

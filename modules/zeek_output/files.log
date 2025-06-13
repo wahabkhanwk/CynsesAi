@@ -1,0 +1,21 @@
+#separator \x09
+#set_separator	,
+#empty_field	(empty)
+#unset_field	-
+#path	files
+#open	2025-06-13-12-05-24
+#fields	ts	fuid	uid	id.orig_h	id.orig_p	id.resp_h	id.resp_p	source	depth	analyzers	mime_type	filename	duration	local_orig	is_orig	seen_bytes	total_bytes	missing_bytes	overflow_bytes	timedout	parent_fuid	md5	sha1	sha256	extracted	extracted_cutoff	extracted_size
+#types	time	string	string	addr	port	addr	port	string	count	set[string]	string	string	interval	bool	bool	count	count	count	count	bool	string	string	string	string	string	bool	count
+1738354989.347547	FaGoIZ2cqwEH0cV1v9	CxFzMF4C0dhIEN7Yyh	10.1.31.101	49738	193.122.6.168	80	HTTP	0	(empty)	text/html	-	0.000000	F	F	103	103	0	0	F	-	-	-	-	-	-	-
+1738354989.492925	FHThR43OPh4w7SqPd4	CxFzMF4C0dhIEN7Yyh	10.1.31.101	49738	193.122.6.168	80	HTTP	0	(empty)	text/html	-	0.000000	F	F	103	103	0	0	F	-	-	-	-	-	-	-
+1738354990.524275	FjW9bl2ACi8NW84i75	CxFzMF4C0dhIEN7Yyh	10.1.31.101	49738	193.122.6.168	80	HTTP	0	(empty)	text/html	-	0.000000	F	F	103	103	0	0	F	-	-	-	-	-	-	-
+1738354990.741756	FTdE2X1Tp3yFpj2Hrk	CxFzMF4C0dhIEN7Yyh	10.1.31.101	49738	193.122.6.168	80	HTTP	0	(empty)	text/html	-	0.000000	F	F	103	103	0	0	F	-	-	-	-	-	-	-
+1738354990.962034	Fa5a5x21QuOGibn5Vd	CxFzMF4C0dhIEN7Yyh	10.1.31.101	49738	193.122.6.168	80	HTTP	0	(empty)	text/html	-	0.000000	F	F	103	103	0	0	F	-	-	-	-	-	-	-
+1738354991.167098	FKqf7r3z9BVoACs44	CxFzMF4C0dhIEN7Yyh	10.1.31.101	49738	193.122.6.168	80	HTTP	0	(empty)	text/html	-	0.000000	F	F	103	103	0	0	F	-	-	-	-	-	-	-
+1738354991.379186	F5oDvy3GfenK6IilW6	CxFzMF4C0dhIEN7Yyh	10.1.31.101	49738	193.122.6.168	80	HTTP	0	(empty)	text/html	-	0.000000	F	F	103	103	0	0	F	-	-	-	-	-	-	-
+1738354991.588862	FFtT6norBtzFEsnsk	CxFzMF4C0dhIEN7Yyh	10.1.31.101	49738	193.122.6.168	80	HTTP	0	(empty)	text/html	-	0.000000	F	F	103	103	0	0	F	-	-	-	-	-	-	-
+1738354991.800003	FtY52g3oLTKIcEb6Qg	CxFzMF4C0dhIEN7Yyh	10.1.31.101	49738	193.122.6.168	80	HTTP	0	(empty)	text/html	-	0.000000	F	F	103	103	0	0	F	-	-	-	-	-	-	-
+1738354992.014429	FT5L4iQZn4w5wkO56	CxFzMF4C0dhIEN7Yyh	10.1.31.101	49738	193.122.6.168	80	HTTP	0	(empty)	text/html	-	0.000000	F	F	103	103	0	0	F	-	-	-	-	-	-	-
+1738354999.605005	FNs0wz2G1P62XLnTij	CJLvHE143SbhJc8NS	10.1.31.101	49741	208.91.198.143	587	SMTP	1	(empty)	text/plain	-	0.000257	T	T	930	-	0	0	F	-	-	-	-	-	-	-
+1738355002.889188	F1li6f3D403DmfR4If	C76ck312zm9V4rAeWk	10.1.31.101	49742	208.91.198.143	587	SMTP	1	(empty)	text/plain	-	0.001014	T	T	72757	-	0	0	F	-	-	-	-	-	-	-
+#close	2025-06-13-12-05-24
