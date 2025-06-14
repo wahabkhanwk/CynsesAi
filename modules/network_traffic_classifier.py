@@ -177,6 +177,6 @@ def predictingRowsCategoryOnGPUByGettingRidOfParameters(file_path, filter_payloa
     for attack, count in packets_brief.items():
         print(f"{attack}: {count}")
 
-if __name__ == "__main__":
+#if __name__ == "__main__":
     # Example usage
-    predictingRowsCategoryOnGPU("/Users/macbook/Desktop/CynsesAI/GoldenEye.pcap", filter_payload=b"HTTP", debug=False)
+#    predictingRowsCategoryOnGPU("/Users/macbook/Desktop/CynsesAI/GoldenEye.pcap", filter_payload=b"HTTP", debug=False)
