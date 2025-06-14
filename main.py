@@ -4,6 +4,7 @@ from modules.threat_intel import real_threat_intel
 from modules.protocol_analysis import analyze_protocols
 from modules.anomaly_detection import detect_anomalies
 from modules.report_generation import generate_report
+from modules.visualization import parse_suricata_fast_log, parse_zeek_conn_log, extract_packet_data_with_scapy, build_enhanced_attack_graph, generate_networkx_plot, generate_plotly_interactive
 from modules.network_traffic_classifier import predictingRowsCategoryOnGPU, packets_brief
 import os
 import json
@@ -355,30 +356,44 @@ def anomaly_detection_node(state: AnalysisState) -> Dict:
         "rag_context": retrieve_suricata_docs("Anomaly detection in network traffic")
     }
 def visualization_node(state: AnalysisState) -> Dict:
-    """Node 7: Attack visualization"""
+    """Node 7: Attack visualization with threat classification"""
     print("📊 Generating attack visualization...")
-    
-    # Prepare data for LLM
-    analysis_data = {
-        "anomalies": state["anomalies"],
-        "key_events": state["suricata_events"][:3]
-    }
-    
-    prompt = f"""
-    Create a visualization plan for these network anomalies:
-    {json.dumps(analysis_data)}
-    
-    Suggest:
-    1. Attack chain visualization approach
-    2. Key entities to include
-    3. Recommended graph type
-    """
-    visualization_plan = llm.invoke(prompt)
-    
+
+    # Paths to intermediate files
+    pcap_path = state.get("pcap_path", PCAP_FILE)
+    suricata_log = "/Users/macbook/Desktop/CynsesAI/modules/suricata_output/fast.log"  # Or use real path
+    zeek_log = "/Users/macbook/Desktop/CynsesAI/modules/zeek_output/conn.log"  # Or use real path
+
+    # Extract data
+    alerts = parse_suricata_fast_log(suricata_log)
+    connections = parse_zeek_conn_log(zeek_log)
+    packets = extract_packet_data_with_scapy(pcap_path)
+
+    # Build graph
+    G = build_enhanced_attack_graph(alerts, connections, packets)
+
+    # Save visualizations
+    os.makedirs("attack_graphs", exist_ok=True)
+    static_path = "attack_graph.png"
+    interactive_path = "interactive_attack_graph.html"
+
+    generate_networkx_plot(G, static_path)
+    generate_plotly_interactive(G, interactive_path)
+
+    # Return results
     return {
         "visualization_data": {
-            "plan": visualization_plan,
-            "entities": ["src_ips", "dest_ips", "malicious_domains"]
+            "graph": G,
+            "graph_image": static_path,
+            "graph_html": interactive_path,
+            "plan": f"""
+            ### Attack Graph Summary
+            - Total nodes: {len(G.nodes())}
+            - Total edges: {len(G.edges())}
+            - Visualizations saved to:
+              - Static: `{static_path}`
+              - Interactive: `{interactive_path}`
+            """
         }
     }
 def summarize_suricata_events(events):
@@ -414,22 +429,25 @@ def report_generation_node(state: AnalysisState) -> Dict:
     protocol_analysis = extract_content(state['protocol_analysis']['llm_analysis'])[:1000]
     threat_intel_analysis = extract_content(state['threat_intel']['llm_analysis'])[:1000]
     anomalies = summarize_anomalies(state['anomalies'])
-    visualization_plan = extract_content(state['visualization_data']['plan'])[:2000]
+    visualization_plan = extract_content(state['visualization_data'].get('plan', ''))[:2000]
     rag_context = extract_content(state['rag_context'])[:2000]
     traffic_classification = (
-    json.dumps(state['traffic_classification'], indent=2)[:2000] 
-    if state.get('traffic_classification') 
-    else "No traffic classification data available."
+        json.dumps(state['traffic_classification'], indent=2)[:2000] 
+        if state.get('traffic_classification') 
+        else "No traffic classification data available."
     )
+    graph_image = state['visualization_data'].get('graph_image', None)
+
+    # Build markdown-compatible image reference
+    image_section = ""
+    if graph_image and os.path.exists(graph_image):
+        image_section = f"\n\n![Attack Graph](./{graph_image})\n"
 
     prompt = f"""
     Create a comprehensive security report for PCAP analysis:
-    having the following components:
-    2. Identify the network protocols involved and filter the traffic by protocols of interest (e.g., TCP, UDP, HTTP, DNS).
-3. Examine packet details to find important information such as source and destination IP addresses, ports, flags, sequence numbers, and payload data.
-4. Look for anomalies or patterns such as retransmissions, unusual port usage, suspicious payloads, or communication with known malicious IPs.
-5. Extract relevant metadata including timestamps and packet sizes to understand traffic flow and timing.
-6. Summarize findings, highlighting any security concerns, network performance issues, or protocol-specific observations.
+
+    Visualization Summary:
+    {visualization_plan}{image_section}
 
     Suricata Events Summary:
     {suricata_summary}
@@ -446,20 +464,16 @@ def report_generation_node(state: AnalysisState) -> Dict:
     Anomalies Detected:
     {anomalies}
 
-    Suricata Documentation Context:
-    {rag_context}
-
     Structure the report with:
     - Executive Summary
     - Technical Findings
     - Threat Assessment
     - Recommended Actions
-    - Visualization Strategy
-    -Threat Classification
+    - Mitre Attacks 
+    - Threat Classification
 
-    at last give the Suricata Rules to prevent similar attacks in the future.
+    At the end, give Suricata rules to prevent similar attacks.
     """
-    
 
     try:
         raw_report = llm.invoke(prompt)
@@ -468,8 +482,7 @@ def report_generation_node(state: AnalysisState) -> Dict:
         print(f"[ERROR] Report generation failed: {e}")
         report = "⚠️ Error: Full report could not be generated."
 
-    return {"report": report}
-# ------------------------
+    return {"report": report}# ------------------------
 # Build the LangGraph
 # ------------------------
 
