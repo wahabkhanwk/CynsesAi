@@ -9,7 +9,7 @@ from modules.network_traffic_classifier import predictingRowsCategoryOnGPU, pack
 import os
 import json
 import subprocess
-from typing import TypedDict, Annotated, Dict, List
+from typing import TypedDict, Annotated, Dict, List, Set, Any
 from langgraph.graph import StateGraph, END
 #from langchain_community.llms import Ollama
 from langchain_openai import ChatOpenAI
@@ -23,6 +23,7 @@ from pathlib import Path
 from langchain_core.messages import BaseMessage
 import requests
 from diskcache import Cache
+from config.settings import PCAP_FILE, SURICATA_DOCS_URL , CHUTES_API_BASE , CHUTES_API_KEY , SURICATA_FAST_LOG , ZEEK_CONN_LOG , SURICATA_CONFIG, SURICATA_OUTPUT_DIR, SURICATA_RULES_DIR, ABUSEIPDB_API_KEY, VIRUSTOTAL_API_KEY, GRAPH_OUTPUT_DIR
 
 os.environ["USER_AGENT"] = "CynsesAI-PCAP-Analyzer/1.0"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -32,8 +33,6 @@ cache = Cache("./cache_dir")
 
 # Configuration
 USE_OLLAMA = False  # Set to False for API-based LLM
-PCAP_FILE = "/Users/macbook/Desktop/CynsesAI/GoldenEye.pcap"  # Path to your PCAP file
-SURICATA_DOCS_URL = "https://suricata.readthedocs.io/en/latest/"
 
 # Define the analysis state
 class AnalysisState(TypedDict):
@@ -47,8 +46,6 @@ class AnalysisState(TypedDict):
     report: str
     rag_context: str
 
-CHUTES_API_KEY = "cpk_b2f19b3b2443491a935341849094244e.0e4c136833ce5488ad2b68a2e843d103.jKtlSsaXnKa1CFQl7BR7UIXa5sfXud8A"
-CHUTES_API_BASE = "https://llm.chutes.ai/v1"
 
 # Initialize LLM
 # Initialize LLM
@@ -154,6 +151,17 @@ def network_traffic_classification_node(state: AnalysisState) -> Dict:
     return {
         "traffic_classification": classification_data
     }
+def ask_run_classifier() -> bool:
+    """Prompt user whether to run the network traffic classifier node."""
+    while True:
+        ans = input("Do you want to run the network traffic classifier? (y/n): ").strip().lower()
+        if ans in ("y", "yes"):
+            return True
+        elif ans in ("n", "no"):
+            return False
+        else:
+            print("Please enter 'y' or 'n'.")
+
 
 #def protocol_analysis_node(state: AnalysisState) -> Dict:
     """Node 4: Perform protocol analysis"""
@@ -214,36 +222,16 @@ def network_traffic_classification_node(state: AnalysisState) -> Dict:
 def protocol_analysis_node(state: AnalysisState) -> Dict:
     """Node 4: Perform protocol analysis"""
     print("📡 Analyzing network protocols...")
-    
-    # Extract protocol info from Zeek logs
-    protocols = {
-        "connections": [],
-        "http_requests": [],
-        "dns_queries": []
+
+    # Call the generic analyzer on all logs
+    zeek_logs = state.get("zeek_logs", {})
+    rag_context = state.get("rag_context", "")
+
+    analysis_result = analyze_protocols(zeek_logs, rag_context)
+
+    return {
+        "protocol_analysis": analysis_result
     }
-    
-    for log_name, lines in state["zeek_logs"].items():
-        if "conn.log" in log_name:
-            # Skip header line and take sample
-            protocols["connections"] = lines[1:11] if len(lines) > 1 else lines
-            
-        elif "http.log" in log_name:
-            # Extract URIs with safety checks
-            for line in lines[1:6]:  # Skip header, take first 5 data lines
-                fields = line.split("\t")
-                if len(fields) > 9:
-                    protocols["http_requests"].append(fields[9])
-                elif fields:  # Still add something if fields exist
-                    protocols["http_requests"].append(fields[0])
-                    
-        elif "dns.log" in log_name:
-            # Extract queries with safety checks
-            for line in lines[1:6]:  # Skip header, take first 5 data lines
-                fields = line.split("\t")
-                if len(fields) > 9:
-                    protocols["dns_queries"].append(fields[9])
-                elif fields:  # Still add something if fields exist
-                    protocols["dns_queries"].append(fields[0])
     
     # Build analysis prompt
     prompt = f"""
@@ -285,33 +273,48 @@ def protocol_analysis_node(state: AnalysisState) -> Dict:
             "llm_analysis": analysis
         }
     }
-def threat_intel_node(state: AnalysisState) -> Dict:
+
+def threat_intel_node(state: Dict[str, Any]) -> Dict[str, Any]:
     """Node 5: Threat intelligence enrichment"""
     print("🌐 Enriching with threat intelligence...")
-    
-    # Extract unique IPs from Suricata events
-    ips = set()
-    for event in state["suricata_events"]:
+
+    # Step 1: Extract unique IPs from Suricata events
+    ips: Set[str] = set()
+    for event in state.get("suricata_events", []):
         if "src_ip" in event:
             ips.add(event["src_ip"])
         if "dest_ip" in event:
             ips.add(event["dest_ip"])
-    
-    # Get threat intel for each IP
+
+    if not ips:
+        return {
+            "threat_intel": {
+                "raw": {},
+                "llm_analysis": "No IPs found in Suricata events for threat intelligence lookup."
+            }
+        }
+
+    # Step 2: Query threat intel for each unique IP using the cached function
     threat_data = {ip: real_threat_intel(ip) for ip in ips}
-    
-    # Add LLM-enhanced analysis
+
+    # Step 3: Generate prompt for LLM analysis
     prompt = f"""
     Analyze this threat intelligence data:
-    {json.dumps(threat_data)}
+    {json.dumps(threat_data, indent=2)}
     
     Suricata Documentation Context:
-    {state['rag_context']}
+    {state.get('rag_context', 'No context provided')}
     
-    Identify any high-risk entities.
+    Identify any high-risk entities, malicious behavior, or suspicious patterns.
     """
-    analysis = llm.invoke(prompt)  # No .content
     
+    # Step 4: Get LLM analysis
+    try:
+        analysis = llm.invoke(prompt)
+    except Exception as e:
+        analysis = f"LLM analysis failed: {str(e)}"
+
+    # Step 5: Return enriched state
     return {
         "threat_intel": {
             "raw": threat_data,
@@ -332,41 +335,25 @@ def anomaly_detection_node(state: AnalysisState) -> Dict:
     """Node 6: Anomaly detection"""
     print("⚠️ Detecting anomalies...")
 
-    # Prepare data for LLM analysis
-    analysis_data = {
-        "suricata_events": state["suricata_events"][:5],  # Sample
-        "protocol_analysis": extract_content(state["protocol_analysis"]["llm_analysis"]),
-        "threat_intel": extract_content(state["threat_intel"]["llm_analysis"])
-    }
+    # Call the custom anomaly detection function
+    # Pass the Suricata output directory and RAG context
+    result = detect_anomalies(SURICATA_OUTPUT_DIR, state.get("rag_context", ""))
 
-    prompt = f"""
-    Analyze this network data for security anomalies:
-    {json.dumps(analysis_data)[:3000]}
-
-    Suricata Documentation Context:
-    {state['rag_context']}
-
-    Identify potential threats and rate severity (1-10).
-    """
-    raw_analysis = llm.invoke(prompt)
-    analysis = extract_content(raw_analysis)
-
-    return {
-        "anomalies": [{"description": analysis, "severity": 7}],  # Simplified
-        "rag_context": retrieve_suricata_docs("Anomaly detection in network traffic")
-    }
+    # Optionally, refresh RAG context for anomaly detection
+    result["rag_context"] = retrieve_suricata_docs("Anomaly detection in network traffic")
+    return result
 def visualization_node(state: AnalysisState) -> Dict:
     """Node 7: Attack visualization with threat classification"""
     print("📊 Generating attack visualization...")
 
     # Paths to intermediate files
     pcap_path = state.get("pcap_path", PCAP_FILE)
-    suricata_log = "/Users/macbook/Desktop/CynsesAI/modules/suricata_output/fast.log"  # Or use real path
-    zeek_log = "/Users/macbook/Desktop/CynsesAI/modules/zeek_output/conn.log"  # Or use real path
+    #suricata_log = "/Users/macbook/Desktop/CynsesAI/modules/suricata_output/fast.log"  # Or use real path
+    #zeek_log = "/Users/macbook/Desktop/CynsesAI/modules/zeek_output/conn.log"  # Or use real path
 
     # Extract data
-    alerts = parse_suricata_fast_log(suricata_log)
-    connections = parse_zeek_conn_log(zeek_log)
+    alerts = parse_suricata_fast_log(SURICATA_FAST_LOG)
+    connections = parse_zeek_conn_log(ZEEK_CONN_LOG)
     packets = extract_packet_data_with_scapy(pcap_path)
 
     # Build graph
@@ -494,7 +481,7 @@ workflow = StateGraph(AnalysisState)
 workflow.add_node("init", initialize_analysis)
 workflow.add_node("suricata", run_suricata_node)
 workflow.add_node("zeek", run_zeek_node)
-workflow.add_node("merge_results", lambda state: state)  # Simple merge node
+workflow.add_node("merge_results", lambda state: state)
 workflow.add_node("protocols", protocol_analysis_node)
 workflow.add_node("threat_intel_node", threat_intel_node)
 workflow.add_node("anomalies_detection_node", anomaly_detection_node)
@@ -503,14 +490,21 @@ workflow.add_node("report_generation_node", report_generation_node)
 workflow.add_node("network_traffic_classifier", network_traffic_classification_node)
 
 # Set up edges for parallel execution and merging
-# Set up edges for parallel execution and merging
 workflow.set_entry_point("init")
 workflow.add_edge("init", "suricata")
 workflow.add_edge("init", "zeek")
 workflow.add_edge("suricata", "merge_results")
 workflow.add_edge("zeek", "merge_results")
-workflow.add_edge("merge_results", "network_traffic_classifier")
-workflow.add_edge("network_traffic_classifier", "protocols")
+
+# Ask user if they want to run the classifier
+RUN_CLASSIFIER = ask_run_classifier()
+
+if RUN_CLASSIFIER:
+    workflow.add_edge("merge_results", "network_traffic_classifier")
+    workflow.add_edge("network_traffic_classifier", "protocols")
+else:
+    workflow.add_edge("merge_results", "protocols")
+
 workflow.add_edge("protocols", "threat_intel_node")
 workflow.add_edge("threat_intel_node", "anomalies_detection_node")
 workflow.add_edge("anomalies_detection_node", "visualization")
