@@ -1,38 +1,35 @@
 from langchain_openai import ChatOpenAI
 from typing import Dict, List
+from config.settings import CHUTES_API_KEY, CHUTES_API_BASE
 
 def analyze_protocols(logs: Dict[str, List[str]], rag_context: str) -> dict:
-    """Perform protocol analysis using LLM"""
-    protocols = {
-        "connections": [],
-        "http_requests": [],
-        "dns_queries": []
-    }
+    """Perform generic protocol analysis using LLM on all .log files"""
+    log_samples = {}
 
     for log_name, lines in logs.items():
-        if "conn.log" in log_name:
-            protocols["connections"] = lines[1:11]
-        elif "http.log" in log_name:
-            for line in lines[1:6]:
-                fields = line.split("\t")
-                if len(fields) > 9:
-                    protocols["http_requests"].append(fields[9])
-        elif "dns.log" in log_name:
-            for line in lines[1:6]:
-                fields = line.split("\t")
-                if len(fields) > 9:
-                    protocols["dns_queries"].append(fields[9])
+        # Skip empty or header-only logs
+        if len(lines) > 1:
+            # Take up to 10 lines after header for each log
+            log_samples[log_name] = lines[1:]
+        elif lines:
+            log_samples[log_name] = lines
 
     prompt = f"""
-    Analyze network activity from Zeek logs and identify suspicious patterns.
-    ### Protocol Summary:
-    {str(protocols)[:2000]}
+    Analyze the following Zeek log samples and identify any suspicious or notable patterns.
+    ### Log Samples:
+    {str(log_samples)[:3000]}
     ### Security Context:
     {rag_context}
     """
-    llm = ChatOpenAI(model="deepseek-ai/DeepSeek-V3-0324", temperature=0.7, max_tokens=1024)
+    llm = ChatOpenAI(
+        model="deepseek-ai/DeepSeek-V3-0324",
+        openai_api_key=CHUTES_API_KEY,
+        openai_api_base=CHUTES_API_BASE,
+        temperature=0.7,
+        max_tokens=1024
+    )
     analysis = llm.invoke(prompt)
     return {
-        "raw": protocols,
+        "raw": log_samples,
         "llm_analysis": analysis.content if hasattr(analysis, 'content') else str(analysis)
     }
