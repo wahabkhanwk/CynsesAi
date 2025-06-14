@@ -1,1 +1,0 @@
-../zynqmp/post-build.sh

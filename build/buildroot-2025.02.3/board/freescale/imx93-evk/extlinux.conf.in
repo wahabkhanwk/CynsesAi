@@ -1,4 +1,0 @@
-label buildroot
-  kernel /boot/Image
-  devicetree /boot/freescale/imx93-11x11-evk.dtb
-  append root=PARTUUID=%PARTUUID% rootwait rw
