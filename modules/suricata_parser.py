@@ -12,8 +12,8 @@ def run_suricata(pcap_path: str) -> list:
     output_dir = "suricata_output"
     os.makedirs(output_dir, exist_ok=True)
     
-    SURICATA_CONFIG = "/opt/homebrew/etc/suricata/suricata.yaml" #Rules
-    OUTPUT_DIR = "suricata_output"
+    SURICATA_CONFIG = "/home/kali/NS_PROJECT/CynsesAi/suricata.yaml" #Rules
+    OUTPUT_DIR = "/home/kali/NS_PROJECT/CynsesAi/modules/suricata_output"
 
     subprocess.run([
         "suricata",
@@ -36,9 +36,10 @@ print ("✅ Suricata module loaded successfully")
 
 if __name__ == "__main__":
     # Replace with the path to a real PCAP file for testing
-    test_pcap = "/Users/macbook/Desktop/CynsesAI/sample.pcap"
+    test_pcap = "/home/kali/NS_PROJECT/CynsesAi/sample.pcap"
     run_suricata(test_pcap)
     print("Suricata analysis completed.")
     #now print the events
     events = run_suricata(test_pcap)
     print("Suricata events:", events)
+
