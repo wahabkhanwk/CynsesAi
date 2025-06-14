@@ -4,6 +4,7 @@ from modules.threat_intel import real_threat_intel
 from modules.protocol_analysis import analyze_protocols
 from modules.anomaly_detection import detect_anomalies
 from modules.report_generation import generate_report
+from modules.network_traffic_classifier import predictingRowsCategoryOnGPU, packets_brief
 import os
 import json
 import subprocess
@@ -23,6 +24,7 @@ import requests
 from diskcache import Cache
 
 os.environ["USER_AGENT"] = "CynsesAI-PCAP-Analyzer/1.0"
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 # Initialize diskcache Cache
 cache = Cache("./cache_dir")
@@ -125,6 +127,32 @@ def run_zeek_node(state: AnalysisState) -> Dict:
     """Node 3: Run Zeek analysis"""
     print("🕵️ Running Zeek on PCAP...")
     return {"zeek_logs": run_zeek(state["pcap_path"])}
+
+#def network_traffic_classification_node(state: AnalysisState) -> Dict:
+    """Node: Classify network traffic using BERT model"""
+    print("🤖 Running network traffic classifier...")
+    # You can use the PCAP file from the state or config
+    pcap_path = state.get("pcap_path", PCAP_FILE)
+    # Call the classifier (you can adjust filter_payload and debug as needed)
+    predictingRowsCategoryOnGPU(pcap_path, filter_payload=None, debug=False)
+    # Optionally, you can collect results from packets_brief if you want to add to state
+    # from modules.network_traffic_classifier import packets_brief
+    # return {"traffic_classification": dict(packets_brief)}
+    return {}  # If you don't need to update the state
+
+def network_traffic_classification_node(state: AnalysisState) -> Dict:
+    """Node: Classify network traffic using BERT model"""
+    print("🤖 Running network traffic classifier...")
+    
+    pcap_path = state.get("pcap_path", PCAP_FILE)
+    predictingRowsCategoryOnGPU(pcap_path, filter_payload=None, debug=False)
+
+    # Extract results
+    classification_data = dict(packets_brief) if 'packets_brief' in globals() else {}
+
+    return {
+        "traffic_classification": classification_data
+    }
 
 #def protocol_analysis_node(state: AnalysisState) -> Dict:
     """Node 4: Perform protocol analysis"""
@@ -388,15 +416,29 @@ def report_generation_node(state: AnalysisState) -> Dict:
     anomalies = summarize_anomalies(state['anomalies'])
     visualization_plan = extract_content(state['visualization_data']['plan'])[:2000]
     rag_context = extract_content(state['rag_context'])[:2000]
+    traffic_classification = (
+    json.dumps(state['traffic_classification'], indent=2)[:2000] 
+    if state.get('traffic_classification') 
+    else "No traffic classification data available."
+    )
 
     prompt = f"""
     Create a comprehensive security report for PCAP analysis:
+    having the following components:
+    2. Identify the network protocols involved and filter the traffic by protocols of interest (e.g., TCP, UDP, HTTP, DNS).
+3. Examine packet details to find important information such as source and destination IP addresses, ports, flags, sequence numbers, and payload data.
+4. Look for anomalies or patterns such as retransmissions, unusual port usage, suspicious payloads, or communication with known malicious IPs.
+5. Extract relevant metadata including timestamps and packet sizes to understand traffic flow and timing.
+6. Summarize findings, highlighting any security concerns, network performance issues, or protocol-specific observations.
 
     Suricata Events Summary:
     {suricata_summary}
 
     Protocol Analysis:
     {protocol_analysis}
+
+    Traffic Classification Summary:
+    {traffic_classification}
 
     Threat Intelligence:
     {threat_intel_analysis}
@@ -413,7 +455,11 @@ def report_generation_node(state: AnalysisState) -> Dict:
     - Threat Assessment
     - Recommended Actions
     - Visualization Strategy
+    -Threat Classification
+
+    at last give the Suricata Rules to prevent similar attacks in the future.
     """
+    
 
     try:
         raw_report = llm.invoke(prompt)
@@ -441,14 +487,17 @@ workflow.add_node("threat_intel_node", threat_intel_node)
 workflow.add_node("anomalies_detection_node", anomaly_detection_node)
 workflow.add_node("visualization", visualization_node)
 workflow.add_node("report_generation_node", report_generation_node)
+workflow.add_node("network_traffic_classifier", network_traffic_classification_node)
 
+# Set up edges for parallel execution and merging
 # Set up edges for parallel execution and merging
 workflow.set_entry_point("init")
 workflow.add_edge("init", "suricata")
 workflow.add_edge("init", "zeek")
 workflow.add_edge("suricata", "merge_results")
 workflow.add_edge("zeek", "merge_results")
-workflow.add_edge("merge_results", "protocols")
+workflow.add_edge("merge_results", "network_traffic_classifier")
+workflow.add_edge("network_traffic_classifier", "protocols")
 workflow.add_edge("protocols", "threat_intel_node")
 workflow.add_edge("threat_intel_node", "anomalies_detection_node")
 workflow.add_edge("anomalies_detection_node", "visualization")
