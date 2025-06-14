@@ -1,110 +1,111 @@
-# **Comprehensive Security Report: PCAP Analysis**  
-*Generated from Suricata Events and Threat Intelligence*  
+# **Comprehensive PCAP Security Analysis Report**
 
 ---
 
-## **1. Executive Summary**  
-### **Key Findings**  
-- **Reconnaissance Activity**: Multiple DNS lookups to dynamic IP services (`checkip.dyndns.org`, `reallyfreegeoip.org`) suggest potential malware checking for external IP or C2 communication.  
-- **Malware Indicators**: ET alerts for **Snake Keylogger** (VIP Recovery via SMTP) and **Matiex Keylogger**-style IP checks.  
-- **Suspicious SMTP Traffic**: Protocol anomalies (one-directional SMTP) and potential exfiltration attempts.  
-- **Telegram API Activity**: Unusual TLS/SNI traffic to `api.telegram.org`, possibly indicating C2 or data exfiltration.  
-- **High-Risk IPs**: Abuse reports for `149.154.167.220` (Telegram Messenger, Netherlands) and `193.122.6.168` (Oracle Cloud, Germany).  
+## **Executive Summary**
+This report analyzes network traffic from a PCAP file processed by Suricata, revealing **multiple security events** including reconnaissance activity, suspicious SMTP traffic, and connections to high-risk IPs. Key findings include:
+- **Reconnaissance**: DNS queries to `checkip.dyndns.org` (indicating external IP lookups).
+- **SMTP Anomalies**: Unidirectional SMTP traffic, suggesting potential command & control (C2) or data exfiltration.
+- **High-Risk IPs**: Connections to Telegram's infrastructure (`149.154.167.220`) and Oracle Cloud IPs with abuse reports.
+- **Attack Graph**: Visualized attack path with **8 nodes and 9 edges**, showing potential lateral movement.
 
-### **Overall Risk Level**: **7/10 (High)**  
-- Evidence of malware (Snake Keylogger) and C2 communication justifies immediate investigation.  
+**Overall Risk Level**: **Moderate-High** (due to SMTP anomalies and connections to suspicious IPs).
 
 ---
 
-## **2. Technical Findings**  
-### **A. Suricata Alerts & Anomalies**  
-| **Event**                          | **Severity** | **Description**                                                                 |
-|------------------------------------|-------------|---------------------------------------------------------------------------------|
-| **ET DYN_DNS Lookup**              | 3/10        | Reconnaissance via `checkip.dyndns.org` (MITRE T1590).                          |
-| **Snake Keylogger (ET MALWARE)**   | 8/10        | SMTP exfiltration alert (`VIP Recovery`).                                       |
-| **SMTP Protocol Anomaly**          | 5/10        | One-directional SMTP traffic (`208.91.198.143`).                                |
-| **Telegram API TLS Alerts**        | 6/10        | Suspicious domain (`api.telegram.org`) in SNI and DNS queries.                  |
-| **Matiex Keylogger IP Check**      | 4/10        | Repeated HTTP requests mimicking keylogger behavior.                            |
+## **Technical Findings**
 
-### **B. Protocol Analysis**  
-- **HTTP/DNS**:  
-  - Repeated `checkip.dyndns.org` queries (indicative of malware checking for connectivity).  
-  - Asymmetric traffic (high `resp_bytes` vs. low `orig_bytes`) suggests data exfiltration.  
-- **SMTP**:  
-  - Anomalous one-directional flows; potential spam or malware exfiltration.  
-  - Snake Keylogger alert ties to SMTP traffic.  
+### **1. Protocol Analysis**
+- **Protocols Observed**:
+  - **DNS**: Queries to `checkip.dyndns.org` (reconnaissance).
+  - **HTTP/HTTPS**: Standard web traffic, but some connections to Telegram API (`api.telegram.org`).
+  - **SMTP**: Unidirectional traffic on port 587 (anomalous behavior).
 
-### **C. Threat Intelligence**  
-| **IP Address**       | **Abuse Score** | **ISP**               | **Risk Context**                                  |
-|----------------------|----------------|-----------------------|--------------------------------------------------|
-| `149.154.167.220`    | 22/100         | Telegram Messenger    | Recent abuse reports; potential C2.              |
-| `193.122.6.168`      | 4/100          | Oracle Cloud          | Data center hosting; lower risk but warrants review. |
+- **Unusual Patterns**:
+  - **TCP Resets (RSTO)**: Multiple connections terminated abruptly, suggesting scanning or failed exploitation.
+  - **High Ephemeral Port Usage**: Normal for clients, but combined with SMTP anomalies, warrants scrutiny.
 
----
+### **2. Suricata Events Breakdown**
+| Timestamp | Event | Source IP | Destination IP | Protocol | Severity | Notes |
+|-----------|-------|-----------|----------------|----------|----------|-------|
+| `2025-02-01T01:23:09` | DNS query to `checkip.dyndns.org` | `10.1.31.101` | `10.1.31.1` | UDP/53 | 4/10 | Reconnaissance |
+| `2025-02-01T01:23:18` | SMTP unidirectional anomaly | `208.91.198.143` | `10.1.31.101` | TCP/587 | 6/10 | Possible C2/exfiltration |
+| `2025-02-01T01:23:12` | Telegram API TLS SNI | `10.1.31.101` | `149.154.167.220` | TCP/443 | 5/10 | High-risk IP |
 
-## **3. Threat Assessment**  
-### **MITRE ATT&CK Mapping**  
-| **Tactic**          | **Technique**                         | **Observed Activity**                              |
-|---------------------|---------------------------------------|---------------------------------------------------|
-| **Reconnaissance**  | T1590 (Network Info Gathering)       | DNS lookups to `dyndns.org`, `freegeoip.org`.     |
-| **Command & Control** | T1071 (Application Layer Protocol)   | Telegram API activity, SMTP anomalies.            |
-| **Exfiltration**    | T1048 (Exfiltration Over SMTP)       | Snake Keylogger SMTP alerts.                      |
-
-### **Malware Attribution**  
-- **Snake Keylogger**: Confirmed via ET alerts (`VIP Recovery`).  
-- **Matiex Keylogger**: IP check behavior matches known keylogger patterns.  
+### **3. Threat Intelligence**
+- **High-Risk IPs**:
+  - `149.154.167.220` (Telegram) – Abuse score: **22/100** (moderate-high risk).
+  - `193.122.6.168` (Oracle Cloud) – Abuse score: **4/100** (low-moderate risk).
+- **Domains of Concern**:
+  - `checkip.dyndns.org` (reconnaissance)
+  - `api.telegram.org` (potential C2)
 
 ---
 
-## **4. Recommended Actions**  
-### **Immediate**  
-- **Isolate Affected Hosts**: Check `10.1.31.101` for malware (Snake/Matiex Keylogger).  
-- **Block Malicious Domains**:  
-  - `checkip.dyndns.org`  
-  - `reallyfreegeoip.org`  
-  - `api.telegram.org` (if not business-critical).  
-- **Inspect SMTP Traffic**: Review emails from `208.91.198.143` for phishing/malware.  
+## **Threat Assessment**
+### **1. MITRE ATT&CK Mapping**
+| Tactic | Technique | Event Example |
+|--------|-----------|---------------|
+| **Reconnaissance (TA0043)** | T1590 (Gather Victim Network Info) | DNS query to `checkip.dyndns.org` |
+| **Command & Control (TA0011)** | T1071 (Application Layer Protocol) | SMTP unidirectional traffic |
+| **Exfiltration (TA0010)** | T1048 (Exfiltration Over Protocol) | SMTP anomalies |
+| **Persistence (TA0003)** | T1133 (External Remote Services) | Telegram API connections |
 
-### **Long-Term**  
-- **Update IDS Rules**:  
-  - Enable `file_data` and `smtp_mime` inspection for deeper SMTP analysis.  
-  - Add custom rules to flag repeated IP lookup patterns.  
-- **Threat Hunting**:  
-  - Search for additional C2 traffic (e.g., Telegram API, other dynamic DNS).  
-  - Review internal hosts for lateral movement.  
-
----
-
-## **5. Visualization Strategy**  
-### **Suggested Dashboards**  
-1. **Malware Activity Timeline**:  
-   - Plot key events (DNS lookups, SMTP alerts) to identify patterns.  
-   - Example:  
-     ```
-     [Timeline] DNS Lookup → HTTP IP Check → SMTP Exfiltration  
-     ```
-2. **Threat Intelligence Heatmap**:  
-   - Highlight high-risk IPs (`149.154.167.220`) and their connections.  
-3. **Protocol Anomaly Chart**:  
-   - Compare normal vs. anomalous SMTP flows.  
-
-### **Tools**  
-- **ELK Stack** (for log correlation).  
-- **Wireshark** (for PCAP deep dive).  
-- **Suricata + Sigma Rules** (for automated detection).  
+### **2. Threat Classification**
+| Threat Type | Likelihood | Impact | Notes |
+|-------------|------------|--------|-------|
+| **Reconnaissance** | High | Low | Internal host checking external IP |
+| **C2/Exfiltration** | Moderate | High | SMTP anomalies, Telegram API |
+| **Malware Delivery** | Low | Moderate | No direct evidence, but possible |
 
 ---
 
-## **Conclusion**  
-This analysis reveals **active malware (Snake Keylogger)**, **reconnaissance**, and **potential C2 communication**. Immediate containment and further forensic review are recommended.  
+## **Recommended Actions**
+### **Immediate Actions**
+1. **Block High-Risk IPs**:  
+   - `149.154.167.220` (Telegram C2 risk)  
+   - `208.91.198.143` (suspicious SMTP source)  
+
+2. **Investigate Internal Host (`10.1.31.101`)**:
+   - Check for malware (e.g., keyloggers, C2 beacons).
+   - Validate if SMTP services are necessary.
+
+3. **Monitor DNS Queries**:
+   - Block unnecessary dynamic DNS lookups (`checkip.dyndns.org`).
+
+### **Long-Term Mitigations**
+- **Suricata Rule Tuning** (see below).  
+- **Enable SMTP Deep Inspection** to detect exfiltration.  
+- **Implement Egress Filtering** to restrict unnecessary outbound traffic.  
+
+---
+
+## **Suricata Rules for Prevention**
+### **1. Block Reconnaissance via DNS**
+```suricata
+alert dns $HOME_NET any -> $EXTERNAL_NET 53 (msg:"ET DYN_DNS External IP Lookup - Block"; dns.query; content:"checkip.dyndns.org"; nocase; sid:1000001; rev:1;)
+```
+
+### **2. Detect SMTP Anomalies**
+```suricata
+alert tcp $EXTERNAL_NET any -> $HOME_NET 587 (msg:"SMTP Unidirectional Traffic - Possible C2"; flow:to_server,no_stream; app-layer-event:smtp.unidirectional; sid:1000002; rev:1;)
+```
+
+### **3. Block High-Risk Telegram IPs**
+```suricata
+drop ip [149.154.167.220] any -> $HOME_NET any (msg:"Block High-Risk Telegram IP"; sid:1000003; rev:1;)
+```
+
+---
+
+## **Conclusion**
+The analyzed PCAP reveals **moderate-to-high risk activity**, particularly around SMTP anomalies and connections to Telegram's infrastructure. **Immediate blocking of suspicious IPs and deeper host inspection** are recommended. Suricata rules provided will help prevent similar incidents.  
 
 **Next Steps**:  
-- Validate host infections.  
-- Update network defenses to block IOCs.  
-- Conduct employee awareness training (phishing risks).  
+- Review internal host (`10.1.31.101`) for compromise.  
+- Monitor for repeated SMTP anomalies.  
+- Consider implementing **network segmentation** to limit lateral movement.  
 
-**Report Generated By**: [Your Name/Team]  
-**Date**: [Current Date]  
-
---- 
-**Appendix**: Full Suricata logs and PCAP excerpts available upon request.
+---
+**Report Generated By**: AI Security Analyst  
+**Date**: 2025-02-01
