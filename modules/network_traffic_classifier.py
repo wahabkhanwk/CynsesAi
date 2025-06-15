@@ -5,6 +5,7 @@ import torch
 from scapy.all import *
 from scapy.layers.inet import IP, TCP
 import os
+
 #from config.settings import PCAP_FILE
 
 # List of output classes
