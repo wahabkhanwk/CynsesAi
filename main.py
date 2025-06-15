@@ -27,9 +27,15 @@ from diskcache import Cache
 #import mermaid
 from IPython.display import Image
 
-from config.settings import PCAP_FILE, SURICATA_DOCS_URL , CHUTES_API_BASE , CHUTES_API_KEY , SURICATA_FAST_LOG , ZEEK_CONN_LOG , SURICATA_CONFIG, SURICATA_OUTPUT_DIR, SURICATA_RULES_DIR, ABUSEIPDB_API_KEY, VIRUSTOTAL_API_KEY, GRAPH_OUTPUT_DIR , ZEEK_OUTPUT_DIR
+# Import only necessary settings, paths will be dynamic
+from config.settings import (
+    PCAP_FILE, SURICATA_DOCS_URL , CHUTES_API_BASE , CHUTES_API_KEY,
+    SURICATA_CONFIG, ABUSEIPDB_API_KEY, VIRUSTOTAL_API_KEY,
+    THREAT_INTEL_FILENAME, ANOMALIES_FILENAME # Added new imports
+)
 import shutil
 import logging
+import uuid # For default analysis ID
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -47,6 +53,8 @@ USE_OLLAMA = False  # Set to False for API-based LLM
 # Define the analysis state
 class AnalysisState(TypedDict):
     pcap_path: str
+    analysis_id: str  # Added
+    base_output_dir: str # Added
     suricata_events: List[Dict]
     zeek_logs: Dict
     protocol_analysis: Dict
@@ -103,56 +111,81 @@ def retrieve_suricata_docs(query: str) -> str:
 # ------------------------
 # LangGraph Node Functions
 # ------------------------
-def cleanup_resources(additional_paths: List[str] = None):
+def cleanup_resources(base_analysis_path: str = None, additional_paths: List[str] = None):
     """
-    Clean up analysis resources including:
-    - Suricata output
-    - Zeek logs
-    - Generated graphs
-    - Cache directory
-    - Any additional specified paths
+    Clean up analysis resources. If base_analysis_path is provided,
+    it cleans resources within that specific path. Otherwise, cleans common global paths.
     
     Args:
-        additional_paths: List of additional paths to clean up
+        base_analysis_path: The base directory for a specific analysis.
+        additional_paths: List of additional global paths to clean up.
     """
-    paths_to_clean = [
-        #SURICATA_OUTPUT_DIR,
-        ZEEK_OUTPUT_DIR,
-        "attack_graphs",
-        GRAPH_OUTPUT_DIR,
-        #"./cache_dir",
-        "__pycache__" , # DiskCache directory
-        *([] if additional_paths is None else additional_paths)
-    ]
-    
-    for path in paths_to_clean:
+    paths_to_clean = []
+    if base_analysis_path:
+        paths_to_clean.extend([
+            os.path.join(base_analysis_path, "suricata_output"),
+            os.path.join(base_analysis_path, "zeek_output"),
+            os.path.join(base_analysis_path, "attack_graphs"),
+            os.path.join(base_analysis_path, "temp_diagram.mmd"),
+            os.path.join(base_analysis_path, "attack_flow.png"),
+            os.path.join(base_analysis_path, "pcap_analysis_report.md")
+        ])
+    else:
+        # Global paths (legacy or general cleanup)
+        paths_to_clean.extend([
+            "suricata_output", # Default legacy dir
+            "zeek_output",     # Default legacy dir
+            "attack_graphs",   # Default legacy dir
+            "attack_graphs",   # Corrected from GRAPH_OUTPUT_DIR variable to string literal
+            "temp_diagram.mmd",
+            "attack_flow.png",
+            "pcap_analysis_report.md"
+        ])
+
+    paths_to_clean.append("__pycache__") # General Python cache
+
+    if additional_paths:
+        paths_to_clean.extend(additional_paths)
+
+    for path_str in paths_to_clean:
+        path_obj = Path(path_str)
         try:
             path_obj = Path(path)
             if path_obj.exists():
                 if path_obj.is_dir():
                     shutil.rmtree(path_obj)
-                    logger.info(f"Successfully removed directory: {path}")
+                    logger.info(f"Successfully removed directory: {path_str}")
                 else:
                     path_obj.unlink()
-                    logger.info(f"Successfully removed file: {path}")
+                    logger.info(f"Successfully removed file: {path_str}")
         except Exception as e:
-            logger.error(f"Failed to remove {path}: {str(e)}")
+            logger.error(f"Failed to remove {path_str}: {str(e)}")
 
 def initialize_analysis(state: AnalysisState) -> Dict:
-    """Node 1: Initialize analysis"""
-    cleanup_resources()
-    #global cache
-    #cache = Cache("./cache_dir")  # Re-initialize after cleanup
-    print("🚀 Starting PCAP analysis workflow")
+    """Node 1: Initialize analysis, setting up paths based on analysis_id."""
+    analysis_id = state.get("analysis_id", str(uuid.uuid4()))
+    base_output_dir = state.get("base_output_dir", os.path.join("analysis_results", analysis_id))
+
+    os.makedirs(base_output_dir, exist_ok=True)
+    # Optional: Clean up previous results for this specific analysis_id if desired
+    # cleanup_resources(base_analysis_path=base_output_dir)
+
+    print(f"🚀 Starting PCAP analysis workflow for analysis ID: {analysis_id}")
+    print(f"Output will be stored in: {base_output_dir}")
+
     return {
         "pcap_path": state["pcap_path"],
+        "analysis_id": analysis_id,
+        "base_output_dir": base_output_dir,
         "rag_context": retrieve_suricata_docs("PCAP analysis with Suricata")
     }
 
 def run_suricata_node(state: AnalysisState) -> Dict:
-    """Node 2: Run Suricata analysis"""
+    """Node 2: Run Suricata analysis with dynamic output path."""
     print("🔍 Running Suricata on PCAP...")
-    events = run_suricata(state["pcap_path"])
+    base_output_dir = state["base_output_dir"]
+    # Ensure SURICATA_CONFIG is available, e.g. from config.settings
+    events = run_suricata(state["pcap_path"], output_dir_base=base_output_dir)
     
     # Retrieve relevant docs for detected events
     if events:
@@ -169,9 +202,10 @@ def run_suricata_node(state: AnalysisState) -> Dict:
     }
 
 def run_zeek_node(state: AnalysisState) -> Dict:
-    """Node 3: Run Zeek analysis"""
+    """Node 3: Run Zeek analysis with dynamic output path."""
     print("🕵️ Running Zeek on PCAP...")
-    return {"zeek_logs": run_zeek(state["pcap_path"])}
+    base_output_dir = state["base_output_dir"]
+    return {"zeek_logs": run_zeek(state["pcap_path"], output_dir_base=base_output_dir)}
 
 #def network_traffic_classification_node(state: AnalysisState) -> Dict:
     """Node: Classify network traffic using BERT model"""
@@ -252,15 +286,16 @@ def generate_attack_diagram(state: AnalysisState) -> str:
     
     return "\n".join(diagram)
 
-def render_diagram(diagram_code: str) -> str:
-    """Render Mermaid diagram to image file using mermaid-cli"""
+def render_diagram(diagram_code: str, state: AnalysisState) -> str:
+    """Render Mermaid diagram to image file using mermaid-cli, using base_output_dir from state."""
     try:
-        # Create a temporary file for the Mermaid code
-        temp_mmd_file = Path("temp_diagram.mmd")
+        base_output_dir = state["base_output_dir"]
+        # Create a temporary file for the Mermaid code in the analysis specific output directory
+        temp_mmd_file = Path(os.path.join(base_output_dir, "temp_diagram.mmd"))
         temp_mmd_file.write_text(diagram_code)
 
-        # Output image path
-        img_path = "attack_flow.png"
+        # Output image path (dynamic, within base_output_dir)
+        img_path = os.path.join(base_output_dir, "attack_flow.png")
 
         # Run mermaid-cli to generate the image
         subprocess.run([
@@ -428,15 +463,35 @@ def threat_intel_node(state: Dict[str, Any]) -> Dict[str, Any]:
     
     # Step 4: Get LLM analysis
     try:
-        analysis = llm.invoke(prompt)
+        analysis_response = llm.invoke(prompt)
+        llm_analysis_content = extract_content(analysis_response)
     except Exception as e:
-        analysis = f"LLM analysis failed: {str(e)}"
+        llm_analysis_content = f"LLM analysis failed: {str(e)}"
 
-    # Step 5: Return enriched state
+    # Data to be returned and saved
+    output_data = {
+        "raw_threat_data": threat_data,
+        "llm_analysis": llm_analysis_content
+    }
+
+    # Save to file
+    base_output_dir = state.get("base_output_dir")
+    if base_output_dir:
+        file_path = os.path.join(base_output_dir, THREAT_INTEL_FILENAME)
+        try:
+            with open(file_path, "w") as f:
+                json.dump(output_data, f, indent=4)
+            print(f"Threat intelligence data saved to {file_path}")
+        except Exception as e:
+            print(f"Failed to save threat intelligence data: {e}")
+    else:
+        print("Warning: base_output_dir not found in state, cannot save threat intelligence.")
+
+    # Step 5: Return enriched state (structure as expected by the rest of the graph)
     return {
-        "threat_intel": {
-            "raw": threat_data,
-            "llm_analysis": analysis
+        "threat_intel": { # This is the key the graph expects
+            "raw": threat_data, # Keep original structure for compatibility if other nodes use this exact format
+            "llm_analysis": llm_analysis_content
         }
     }
 
@@ -451,12 +506,14 @@ def extract_content(response):
 
 
 def anomaly_detection_node(state: AnalysisState) -> Dict:
-    """Node 6: Anomaly Detection Node"""
+    """Node 6: Anomaly Detection Node with dynamic Suricata output path."""
     print("⚠️ Detecting anomalies...")
+    base_output_dir = state["base_output_dir"]
+    suricata_output_dir = os.path.join(base_output_dir, "suricata_output")
 
     try:
         # Step 1: Parse and filter logs from Suricata output directory
-        parsed_logs = parse_fastlog(SURICATA_OUTPUT_DIR)
+        parsed_logs = parse_fastlog(suricata_output_dir)
 
         # Step 2: Detect anomalies using filtered logs
         anomaly_result = asyncio.run(process_alerts(parsed_logs))
@@ -464,16 +521,52 @@ def anomaly_detection_node(state: AnalysisState) -> Dict:
         # Step 3: Summarize results for reporting
         summary = summarize_anomalies(anomaly_result.get("anomalies", []))
 
-        # Step 4: Update state with results
-        return {
-            "anomalies": anomaly_result["anomalies"],
+        # Add summary to the anomaly_result to save it too
+        anomaly_result_to_save = {
+            "anomalies": anomaly_result.get("anomalies", []),
             "anomaly_summary": summary,
-            "status": "completed"
+            "status": anomaly_result.get("status", "unknown") # ensure status is also saved
+        }
+
+        # Save anomaly_result_to_save to file
+        base_output_dir = state.get("base_output_dir")
+        if base_output_dir:
+            file_path = os.path.join(base_output_dir, ANOMALIES_FILENAME)
+            try:
+                with open(file_path, "w") as f:
+                    json.dump(anomaly_result_to_save, f, indent=4)
+                print(f"Anomaly detection data saved to {file_path}")
+            except Exception as e:
+                print(f"Failed to save anomaly detection data: {e}")
+        else:
+            print("Warning: base_output_dir not found in state, cannot save anomaly data.")
+
+        # Step 4: Update state with results (ensure this matches what subsequent nodes expect)
+        return {
+            "anomalies": anomaly_result.get("anomalies", []), # Original list of anomalies
+            "anomaly_summary": summary, # The generated summary
+            "status": "completed" # Overall status of this node
         }
 
     except Exception as e:
         print(f"❌ Anomaly detection failed: {e}")
-        return {
+        # Save error information if possible
+        base_output_dir = state.get("base_output_dir")
+        if base_output_dir:
+            error_output = {
+                "anomalies": [],
+                "anomaly_summary": f"⚠️ Anomaly detection failed: {e}",
+                "status": "failed"
+            }
+            file_path = os.path.join(base_output_dir, ANOMALIES_FILENAME)
+            try:
+                with open(file_path, "w") as f:
+                    json.dump(error_output, f, indent=4)
+                print(f"Anomaly detection error data saved to {file_path}")
+            except Exception as save_e:
+                print(f"Failed to save anomaly detection error data: {save_e}")
+
+        return { # Return structure consistent with success case
             "anomalies": [],
             "anomaly_summary": f"⚠️ Anomaly detection failed: {e}",
             "status": "failed"
@@ -485,21 +578,24 @@ def visualization_node(state: AnalysisState) -> Dict:
 
     # Paths to intermediate files
     pcap_path = state.get("pcap_path", PCAP_FILE)
-    #suricata_log = "/Users/macbook/Desktop/CynsesAI/modules/suricata_output/fast.log"  # Or use real path
-    #zeek_log = "/Users/macbook/Desktop/CynsesAI/modules/zeek_output/conn.log"  # Or use real path
+    base_output_dir = state["base_output_dir"]
+    suricata_log_path = os.path.join(base_output_dir, "suricata_output", "fast.log")
+    zeek_log_path = os.path.join(base_output_dir, "zeek_output", "conn.log")
 
     # Extract data
-    alerts = parse_suricata_fast_log(SURICATA_FAST_LOG)
-    connections = parse_zeek_conn_log(ZEEK_CONN_LOG)
+    alerts = parse_suricata_fast_log(suricata_log_path)
+    connections = parse_zeek_conn_log(zeek_log_path)
     packets = extract_packet_data_with_scapy(pcap_path)
 
     # Build graph
     G = build_enhanced_attack_graph(alerts, connections, packets)
 
-    # Save visualizations
-    os.makedirs("attack_graphs", exist_ok=True)
-    static_path = "attack_graph.png"
-    interactive_path = "interactive_attack_graph.html"
+    # Save visualizations to dynamic path
+    graph_output_dir = os.path.join(base_output_dir, "attack_graphs")
+    os.makedirs(graph_output_dir, exist_ok=True)
+
+    static_path = os.path.join(graph_output_dir, "attack_graph.png")
+    interactive_path = os.path.join(graph_output_dir, "interactive_attack_graph.html")
 
     generate_networkx_plot(G, static_path)
     generate_plotly_interactive(G, interactive_path)
@@ -508,8 +604,8 @@ def visualization_node(state: AnalysisState) -> Dict:
     return {
         "visualization_data": {
             "graph": G,
-            "graph_image": static_path,
-            "graph_html": interactive_path,
+            "graph_image": static_path, # Path is now absolute or relative to repo root
+            "graph_html": interactive_path, # Path is now absolute or relative to repo root
             "plan": f"""
             ### Attack Graph Summary
             - Total nodes: {len(G.nodes())}
@@ -552,10 +648,12 @@ def report_generation_node(state: AnalysisState) -> Dict:
     """Node 8: Generate final report with attack diagrams"""
     print("📝 Generating comprehensive report with attack diagrams...")
     
-    # Generate attack diagram
-    diagram_code = generate_attack_diagram(state)
-    diagram_path = render_diagram(diagram_code) if diagram_code else ""
+    base_output_dir = state["base_output_dir"]
     
+    # Generate attack diagram
+    diagram_code = generate_attack_diagram(state) # Assumes generate_attack_diagram uses state for paths if needed
+    diagram_path = render_diagram(diagram_code, state) if diagram_code else "" # Pass state to render_diagram
+
     # Safely summarize inputs
     suricata_events = state.get('suricata_events') or []
     protocol_analysis_dict = state.get('protocol_analysis') or {}
@@ -578,12 +676,16 @@ def report_generation_node(state: AnalysisState) -> Dict:
     )
     graph_image = visualization_data.get('graph_image', None)
     
-    # Build markdown image references
+    # Build markdown image references (relative to the report in base_output_dir)
     image_sections = []
     if diagram_path and os.path.exists(diagram_path):
-        image_sections.append(f"\n\n![Attack Flow Diagram](./{diagram_path})\n")
+        # diagram_path is now like "analysis_results/uuid/attack_flow.png"
+        # The report will be in "analysis_results/uuid/report.md"
+        # So, relative path is just the filename.
+        image_sections.append(f"\n\n![Attack Flow Diagram](./{os.path.basename(diagram_path)})\n")
     if graph_image and os.path.exists(graph_image):
-        image_sections.append(f"\n\n![Network Attack Graph](./{graph_image})\n")
+        # graph_image is like "analysis_results/uuid/attack_graphs/graph.png"
+        image_sections.append(f"\n\n![Network Attack Graph](./attack_graphs/{os.path.basename(graph_image)})\n")
         
     # Prepare diagram code for report
     diagram_section = ""
@@ -719,23 +821,88 @@ app = workflow.compile()
 # Execute the workflow
 # ------------------------
 
-def run_analysis(pcap_path: str):
-    """Execute the analysis workflow"""
-    inputs = {"pcap_path": pcap_path}
+# New main analysis function
+def perform_pcap_analysis(pcap_file_path: str, analysis_id: str):
+    """
+    Performs the full PCAP analysis workflow for a given PCAP file and analysis ID.
+    Saves outputs to a unique directory under analysis_results.
+    Returns the path to the final report.
+    """
+    base_output_dir = os.path.join("analysis_results", analysis_id)
+    os.makedirs(base_output_dir, exist_ok=True)
+
+    # Initial state for the graph
+    initial_state = {
+        "pcap_path": pcap_file_path,
+        "analysis_id": analysis_id,
+        "base_output_dir": base_output_dir,
+        # Initialize other fields to prevent potential KeyErrors if not set by init node
+        "suricata_events": [],
+        "zeek_logs": {},
+        "protocol_analysis": {},
+        "threat_intel": {},
+        "anomalies": [],
+        "visualization_data": {},
+        "report": "",
+        "rag_context": ""
+    }
+
+    # Clean up previous run for this ID, if any (optional, based on desired behavior)
+    # cleanup_resources(base_analysis_path=base_output_dir)
+
+    print(f"Starting analysis for {pcap_file_path} (ID: {analysis_id})...")
+    results = app.invoke(initial_state)
+
+    print("\n" + "="*50)
+    print(f"✅ ANALYSIS COMPLETE for ID: {analysis_id}")
+    print("="*50)
+
+    # Save full report to the analysis-specific directory
+    report_filename = "pcap_analysis_report.md"
+    report_path = os.path.join(base_output_dir, report_filename)
+    with open(report_path, "w") as f:
+        f.write(results["report"])
+
+    print("\n📄 Report Summary:")
+    print(results["report"][:2000] + "...") # Display a snippet
+    print(f"\nFull report saved to {report_path}")
+
+    # Save other artifacts like diagram image path if needed, or ensure they are in results
+    if "diagram_image" in results and results["diagram_image"]:
+        print(f"Attack flow diagram saved to: {results['diagram_image']}")
+    if "visualization_data" in results and results["visualization_data"].get("graph_image"):
+        print(f"Network attack graph saved to: {results['visualization_data']['graph_image']}")
+
+    return report_path, results # Return path and full results
+
+def run_analysis_legacy(pcap_path: str):
+    """Execute the analysis workflow (legacy, for comparison or testing specific parts without full ID structure)"""
+    # This is closer to the original run_analysis, might not use analysis_id structure fully
+    # For testing, ensure it sets up some default base_output_dir if nodes expect it.
+    analysis_id = str(uuid.uuid4())
+    base_output_dir = os.path.join("analysis_results", "legacy_run", analysis_id)
+    os.makedirs(base_output_dir, exist_ok=True)
+
+    inputs = {
+        "pcap_path": pcap_path,
+        "analysis_id": analysis_id,
+        "base_output_dir": base_output_dir
+    }
     results = app.invoke(inputs)
     
     print("\n" + "="*50)
-    print("✅ ANALYSIS COMPLETE")
+    print("✅ LEGACY ANALYSIS COMPLETE")
     print("="*50)
     
-    # Save full report
-    with open("pcap_analysis_report.md", "w") as f:
+    report_path = os.path.join(base_output_dir, "pcap_analysis_report.md")
+    with open(report_path, "w") as f:
         f.write(results["report"])
     
-    # Print summary
     print("\n📄 Report Summary:")
     print(results["report"][:2000] + "...")
-    print(f"\nFull report saved to pcap_analysis_report.md")
+    print(f"\nFull report saved to {report_path}")
+    return results
+
 
 def summarize_state_for_gpt(state: AnalysisState) -> str:
     """
@@ -858,5 +1025,29 @@ def interactive_gpt_session(final_state: AnalysisState):
 
 # Run the analysis
 if __name__ == "__main__":
-    final_state = run_analysis(PCAP_FILE)
-    interactive_gpt_session(final_state)
+    # Example of using the new function
+    sample_pcap_file = PCAP_FILE # Use the one from settings or provide a direct path
+    analysis_session_id = f"cli_run_{str(uuid.uuid4())[:8]}" # Create a unique ID for this run
+
+    print(f"Running analysis for PCAP: {sample_pcap_file} with ID: {analysis_session_id}")
+
+    # Ensure the PCAP file exists
+    if not os.path.exists(sample_pcap_file):
+        print(f"Error: PCAP file not found at {sample_pcap_file}")
+        print("Please ensure PCAP_FILE in config/settings.py points to a valid file or provide a direct path.")
+    else:
+        # Perform the analysis
+        final_report_path, final_state = perform_pcap_analysis(sample_pcap_file, analysis_session_id)
+
+        # Start interactive session with the results of the new analysis function
+        # The final_state from perform_pcap_analysis should be compatible
+        if final_state:
+             interactive_gpt_session(final_state)
+        else:
+            print("Analysis did not return a final state for interactive session.")
+
+    # To test the legacy run (optional):
+    # print("\n\nRunning legacy analysis for comparison...")
+    # legacy_final_state = run_analysis_legacy(PCAP_FILE)
+    # if legacy_final_state:
+    #     interactive_gpt_session(legacy_final_state) # If you want to test this too

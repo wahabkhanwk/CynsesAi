@@ -10,18 +10,21 @@ from config.settings import SURICATA_CONFIG, PCAP_FILE
 #cache = Cache("./cache_dir")
 
 #@cache.memoize()
-def run_suricata(pcap_path: str) -> list:
+def run_suricata(pcap_path: str, output_dir_base: str = None) -> list:
     """Run Suricata on PCAP file and parse results"""
-    output_dir = "suricata_output"
+    if output_dir_base:
+        output_dir = os.path.join(output_dir_base, "suricata_output")
+    else:
+        output_dir = "suricata_output"
     os.makedirs(output_dir, exist_ok=True)
     
     #SURICATA_CONFIG = "/opt/homebrew/etc/suricata/suricata.yaml" #Rules
-    OUTPUT_DIR = "suricata_output"
+    # OUTPUT_DIR = "suricata_output" # This line seems redundant
 
     try:
         subprocess.run([
             "suricata",
-            "-c", SURICATA_CONFIG,
+            "-c", SURICATA_CONFIG, # Ensure SURICATA_CONFIG is correctly defined in config.settings or globally
             "-r", pcap_path,
             "-l", output_dir
         ], check=True)
@@ -44,8 +47,9 @@ print ("✅ Suricata module loaded successfully")
 if __name__ == "__main__":
     # Replace with the path to a real PCAP file for testing
     test_pcap = PCAP_FILE
-    run_suricata(test_pcap)
-    print("Suricata analysis completed.")
-    #now print the events
+    # Example of running with a base directory
+    # run_suricata(test_pcap, output_dir_base="analysis_results/test_analysis_id")
+    # Original way for standalone testing:
     events = run_suricata(test_pcap)
+    print("Suricata analysis completed.")
     print("Suricata events:", events)
