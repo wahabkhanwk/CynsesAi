@@ -300,7 +300,7 @@ def generate_networkx_plot(G, filename="attack_graph.png"):
                "Red Edges: Security Alerts | Blue Edges: Network Connections | Purple Edges: Packet Flows",
                ha="center", fontsize=10)
     plt.tight_layout()
-    plt.savefig(os.path.join(GRAPH_OUTPUT_DIR, filename), dpi=300, bbox_inches='tight')
+    plt.savefig(filename, dpi=300, bbox_inches='tight')
     plt.close()
     print(f"[+] NetworkX attack graph saved to {filename}")
 
@@ -446,7 +446,7 @@ def generate_plotly_interactive(G, filename="interactive_attack_graph.html"):
         font=dict(size=12)
     )
     
-    fig.write_html(os.path.join(GRAPH_OUTPUT_DIR, filename))
+    fig.write_html(filename)
     print(f"[+] Interactive Plotly graph saved to {filename}")
 
 def generate_summary_report(alerts, connections, packets, filename="attack_summary.html"):
@@ -558,8 +558,15 @@ if __name__ == "__main__":
     )
     
     print("[+] Generating visualizations...")
-    generate_networkx_plot(attack_graph, "enterprise_attack_graph.png")
-    generate_plotly_interactive(attack_graph, "interactive_attack_graph.html")
+
+    # Ensure output directory exists
+    os.makedirs(GRAPH_OUTPUT_DIR, exist_ok=True)
+
+    static_path = os.path.join(GRAPH_OUTPUT_DIR, "enterprise_attack_graph.png")
+    interactive_path = os.path.join(GRAPH_OUTPUT_DIR, "interactive_attack_graph.html")
+
+    generate_networkx_plot(attack_graph, static_path)
+    generate_plotly_interactive(attack_graph, interactive_path)
     generate_summary_report(
         suricata_alerts, 
         zeek_connections, 
