@@ -1,8 +1,8 @@
 from modules.suricata_parser import run_suricata
 from modules.zeek import run_zeek
 from modules.threat_intel import real_threat_intel
-from modules.protocol_analysis import analyze_protocols
-from modules.anomaly_detection import detect_anomalies
+from modules.protocol_analysis import analyze_protocols 
+from modules.anomaly_detection import parse_fastlog , process_alerts
 from modules.report_generation import generate_report
 from modules.visualization import parse_suricata_fast_log, parse_zeek_conn_log, extract_packet_data_with_scapy, build_enhanced_attack_graph, generate_networkx_plot, generate_plotly_interactive
 from modules.network_traffic_classifier import predictingRowsCategoryOnGPU, packets_brief
@@ -21,7 +21,8 @@ from langchain_ollama import OllamaLLM, OllamaEmbeddings
 from pathlib import Path
 #from suricata_parser import run_suricata
 from langchain_core.messages import BaseMessage
-import requests
+import time
+import asyncio
 from diskcache import Cache
 from config.settings import PCAP_FILE, SURICATA_DOCS_URL , CHUTES_API_BASE , CHUTES_API_KEY , SURICATA_FAST_LOG , ZEEK_CONN_LOG , SURICATA_CONFIG, SURICATA_OUTPUT_DIR, SURICATA_RULES_DIR, ABUSEIPDB_API_KEY, VIRUSTOTAL_API_KEY, GRAPH_OUTPUT_DIR
 
@@ -331,17 +332,36 @@ def extract_content(response):
     else:
         return str(response)
 
+
 def anomaly_detection_node(state: AnalysisState) -> Dict:
-    """Node 6: Anomaly detection"""
+    """Node 6: Anomaly Detection Node"""
     print("⚠️ Detecting anomalies...")
 
-    # Call the custom anomaly detection function
-    # Pass the Suricata output directory and RAG context
-    result = detect_anomalies(SURICATA_OUTPUT_DIR, state.get("rag_context", ""))
+    try:
+        # Step 1: Parse and filter logs from Suricata output directory
+        parsed_logs = parse_fastlog(SURICATA_OUTPUT_DIR)
 
-    # Optionally, refresh RAG context for anomaly detection
-    result["rag_context"] = retrieve_suricata_docs("Anomaly detection in network traffic")
-    return result
+        # Step 2: Detect anomalies using filtered logs
+        anomaly_result = asyncio.run(process_alerts(parsed_logs))
+
+        # Step 3: Summarize results for reporting
+        summary = summarize_anomalies(anomaly_result.get("anomalies", []))
+
+        # Step 4: Update state with results
+        return {
+            "anomalies": anomaly_result["anomalies"],
+            "anomaly_summary": summary,
+            "status": "completed"
+        }
+
+    except Exception as e:
+        print(f"❌ Anomaly detection failed: {e}")
+        return {
+            "anomalies": [],
+            "anomaly_summary": f"⚠️ Anomaly detection failed: {e}",
+            "status": "failed"
+        }
+        
 def visualization_node(state: AnalysisState) -> Dict:
     """Node 7: Attack visualization with threat classification"""
     print("📊 Generating attack visualization...")
@@ -395,35 +415,47 @@ def summarize_suricata_events(events):
     except Exception:
         return str(events)[:3000]
 
-def summarize_anomalies(anomalies):
-    """Summarize anomalies for the report."""
+def summarize_anomalies(anomalies: list):
+    """
+    Summarize anomalies for final report output.
+    """
     if not anomalies:
-        return "No anomalies detected."
+        return "✅ No anomalies detected."
+
     try:
         return "\n".join(
-            f"- Severity {a.get('severity', '?')}: {a.get('description', str(a)[:100])}"
+            f"- Severity {a.get('severity', '?')}: {a.get('description', 'Unknown issue')}"
             for a in anomalies
         )
     except Exception:
-        return str(anomalies)[:2000]
+        return "⚠️ Failed to summarize anomalies due to formatting issues.\n" + str(anomalies)[:2000]
+    
 
 def report_generation_node(state: AnalysisState) -> Dict:
-    """Node 8: Generate final report"""
+    """Node 8: Generate final report with error handling and retries"""
     print("📝 Generating comprehensive report...")
 
     # Safely summarize inputs
-    suricata_summary = summarize_suricata_events(state['suricata_events'][:3000])
-    protocol_analysis = extract_content(state['protocol_analysis']['llm_analysis'])[:1000]
-    threat_intel_analysis = extract_content(state['threat_intel']['llm_analysis'])[:1000]
-    anomalies = summarize_anomalies(state['anomalies'])
-    visualization_plan = extract_content(state['visualization_data'].get('plan', ''))[:2000]
-    rag_context = extract_content(state['rag_context'])[:2000]
+    suricata_events = state.get('suricata_events') or []
+    protocol_analysis_dict = state.get('protocol_analysis') or {}
+    threat_intel_dict = state.get('threat_intel') or {}
+    anomalies_list = state.get('anomalies') or []
+    visualization_data = state.get('visualization_data') or {}
+    rag_context_val = state.get('rag_context') or ""
+
+    # Generate summaries with safe defaults
+    suricata_summary = summarize_suricata_events(suricata_events[:3000])
+    protocol_analysis = extract_content(protocol_analysis_dict.get('llm_analysis', ''))[:1000]
+    threat_intel_analysis = extract_content(threat_intel_dict.get('llm_analysis', ''))[:1000]
+    anomalies = summarize_anomalies(anomalies_list)
+    visualization_plan = extract_content(visualization_data.get('plan', ''))[:2000]
+    rag_context = extract_content(rag_context_val)[:2000]
     traffic_classification = (
-        json.dumps(state['traffic_classification'], indent=2)[:2000] 
+        json.dumps(state.get('traffic_classification', {}), indent=2)[:2000] 
         if state.get('traffic_classification') 
         else "No traffic classification data available."
     )
-    graph_image = state['visualization_data'].get('graph_image', None)
+    graph_image = visualization_data.get('graph_image', None)
 
     # Build markdown-compatible image reference
     image_section = ""
@@ -456,20 +488,52 @@ def report_generation_node(state: AnalysisState) -> Dict:
     - Technical Findings
     - Threat Assessment
     - Recommended Actions
-    - Mitre Attacks 
+    - Mitre ATT&CK Mapping 
     - Threat Classification
 
-    At the end, give Suricata rules to prevent similar attacks.
+    At the end, provide Suricata rules to prevent similar attacks.
     """
 
-    try:
-        raw_report = llm.invoke(prompt)
-        report = extract_content(raw_report)
-    except Exception as e:
-        print(f"[ERROR] Report generation failed: {e}")
-        report = "⚠️ Error: Full report could not be generated."
-
-    return {"report": report}# ------------------------
+    # Implement retry logic with exponential backoff
+    max_retries = 3
+    retry_delay = 5  # seconds
+    report = "⚠️ Error: Full report could not be generated."
+    
+    for attempt in range(max_retries):
+        try:
+            raw_report = llm.invoke(prompt)
+            report = extract_content(raw_report)
+            break  # Success - exit retry loop
+        except Exception as e:
+            print(f"[Attempt {attempt + 1}/{max_retries}] Report generation failed: {str(e)[:200]}")
+            if attempt < max_retries - 1:
+                print(f"Retrying in {retry_delay} seconds...")
+                time.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
+            else:
+                # On final failure, generate a minimal report
+                report = f"""
+                ⚠️ Partial Report (LLM service unavailable)
+                
+                # Network Security Analysis Summary
+                
+                ## Key Findings
+                - Suricata Events: {len(suricata_events)} alerts
+                - Anomalies Detected: {len(anomalies_list)}
+                - Threat Indicators: {len(threat_intel_dict.get('matches', []))}
+                
+                ## Visualization
+                {image_section}
+                
+                ## Next Steps
+                Please retry later for full analysis details or contact support.
+                """
+    
+    return {
+        "report": report,
+        "status": "complete" if not report.startswith("⚠️") else "partial"
+    }
+# ------------------------
 # Build the LangGraph
 # ------------------------
 
