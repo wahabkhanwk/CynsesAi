@@ -1,11 +1,11 @@
 import requests
 import json
 from diskcache import Cache
-
+import os
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from config.settings import ABUSEIPDB_API_KEY, VIRUSTOTAL_API_KEY
 cache = Cache("./cache_dir")
-
-ABUSEIPDB_API_KEY = "99b0c8552352c73ac74739cf496a06d8e006ff2353d6b21d5d9a6e07f616f3d9dcc507b1eade1cca"
-VIRUSTOTAL_API_KEY = "a6133d71ebbf6cfa1740763438628f50225d745ac17f7e4d73069c60c1a41edc"
 
 @cache.memoize()
 def real_threat_intel(ip: str) -> dict:
@@ -42,7 +42,7 @@ def real_threat_intel(ip: str) -> dict:
         "abuseipdb": abuse_data
     }
 
-if __name__ == "__main__":
-    test_ip = "193.32.162.157"  
-    result = real_threat_intel(test_ip)
-    print(json.dumps(result, indent=4)) 
+#if __name__ == "__main__":
+#   test_ip = "193.32.162.157"
+#   result = real_threat_intel(test_ip)
+#   print(json.dumps(result, indent=4))
