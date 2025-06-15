@@ -2,7 +2,10 @@ import os
 import json
 import subprocess
 from diskcache import Cache
+import sys
 
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from config.settings import SURICATA_CONFIG, PCAP_FILE
 # Initialize diskcache
 cache = Cache("./cache_dir")
 
@@ -12,15 +15,19 @@ def run_suricata(pcap_path: str) -> list:
     output_dir = "suricata_output"
     os.makedirs(output_dir, exist_ok=True)
     
-    SURICATA_CONFIG = "/home/kali/NS_PROJECT/CynsesAi/suricata.yaml" #Rules
-    OUTPUT_DIR = "/home/kali/NS_PROJECT/CynsesAi/modules/suricata_output"
+    #SURICATA_CONFIG = "/opt/homebrew/etc/suricata/suricata.yaml" #Rules
+    OUTPUT_DIR = "suricata_output"
 
-    subprocess.run([
-        "suricata",
-        "-c", SURICATA_CONFIG,
-        "-r", pcap_path,
-        "-l", OUTPUT_DIR
-    ], check=True)
+    try:
+        subprocess.run([
+            "suricata",
+            "-c", SURICATA_CONFIG,
+            "-r", pcap_path,
+            "-l", output_dir
+        ], check=True)
+    except Exception as e:
+        print(f"[ERROR] Suricata failed: {e}")
+        return []
 
     events = []
     eve_path = os.path.join(output_dir, "eve.json")
@@ -36,10 +43,9 @@ print ("✅ Suricata module loaded successfully")
 
 if __name__ == "__main__":
     # Replace with the path to a real PCAP file for testing
-    test_pcap = "/home/kali/NS_PROJECT/CynsesAi/sample.pcap"
+    test_pcap = PCAP_FILE
     run_suricata(test_pcap)
     print("Suricata analysis completed.")
     #now print the events
     events = run_suricata(test_pcap)
     print("Suricata events:", events)
-
