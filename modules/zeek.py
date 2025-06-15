@@ -3,9 +3,9 @@ from pathlib import Path
 import subprocess
 from diskcache import Cache
 
-cache = Cache("./cache_dir")
+#cache = Cache("./cache_dir")
 
-@cache.memoize()
+#@cache.memoize()
 def run_zeek(pcap_path: str) -> dict:
     """Run Zeek on PCAP file and parse logs"""
     output_dir = "zeek_output"
