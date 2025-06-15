@@ -34,14 +34,14 @@ def run_zeek(pcap_path: str) -> dict:
             logs[log_file.name] = [f"Error reading log: {str(e)}"]
     return logs
 
-if __name__ == "__main__":
+#if __name__ == "__main__":
     # Replace with the path to a real PCAP file for testing
-    test_pcap = "/Users/macbook/Desktop/CynsesAI/sample.pcap"
-    logs = run_zeek(test_pcap)
-    print("Zeek logs:", logs)
+#    test_pcap = "/Users/macbook/Desktop/CynsesAI/sample2.pcap"
+#    logs = run_zeek(test_pcap)
+#    print("Zeek logs:", logs)
     #now print the logs
-    for log_name, lines in logs.items():
-        print(f"Log: {log_name}")
-        for line in lines:
-            print(line.strip())
-    print("✅ Zeek module loaded successfully")
+#    for log_name, lines in logs.items():
+#        print(f"Log: {log_name}")
+ #       for line in lines:
+ #           print(line.strip())
+ # #  print("✅ Zeek module loaded successfully")
