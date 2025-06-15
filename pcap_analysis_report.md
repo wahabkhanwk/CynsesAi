@@ -1,111 +1,101 @@
-# **Comprehensive PCAP Security Analysis Report**
+# **PCAP Analysis Security Report**  
+**Date:** 2025-02-11  
+**Analyst:** [Your Name]  
 
 ---
 
-## **Executive Summary**
-This report analyzes network traffic from a PCAP file processed by Suricata, revealing **multiple security events** including reconnaissance activity, suspicious SMTP traffic, and connections to high-risk IPs. Key findings include:
-- **Reconnaissance**: DNS queries to `checkip.dyndns.org` (indicating external IP lookups).
-- **SMTP Anomalies**: Unidirectional SMTP traffic, suggesting potential command & control (C2) or data exfiltration.
-- **High-Risk IPs**: Connections to Telegram's infrastructure (`149.154.167.220`) and Oracle Cloud IPs with abuse reports.
-- **Attack Graph**: Visualized attack path with **8 nodes and 9 edges**, showing potential lateral movement.
+## **1. Executive Summary**  
+This report analyzes network traffic captured in a PCAP file, revealing **multiple high-severity security events** indicative of a potential compromise. Key findings include:  
+- **Malicious IP Communication**: Internal host `10.2.10.101` communicated with `193.143.1.205` (Spamhaus DROP-listed).  
+- **Suspicious DLL Downloads**: Multiple `.dll` requests via WebDAV and HTTP, suggesting malware delivery.  
+- **PowerShell Abuse**: PowerShell traffic to a malicious IP, indicative of post-exploitation activity.  
+- **PE File Anomalies**: Executable files with unusual characteristics (ASLR without DEP, missing sections).  
 
-**Overall Risk Level**: **Moderate-High** (due to SMTP anomalies and connections to suspicious IPs).
-
----
-
-## **Technical Findings**
-
-### **1. Protocol Analysis**
-- **Protocols Observed**:
-  - **DNS**: Queries to `checkip.dyndns.org` (reconnaissance).
-  - **HTTP/HTTPS**: Standard web traffic, but some connections to Telegram API (`api.telegram.org`).
-  - **SMTP**: Unidirectional traffic on port 587 (anomalous behavior).
-
-- **Unusual Patterns**:
-  - **TCP Resets (RSTO)**: Multiple connections terminated abruptly, suggesting scanning or failed exploitation.
-  - **High Ephemeral Port Usage**: Normal for clients, but combined with SMTP anomalies, warrants scrutiny.
-
-### **2. Suricata Events Breakdown**
-| Timestamp | Event | Source IP | Destination IP | Protocol | Severity | Notes |
-|-----------|-------|-----------|----------------|----------|----------|-------|
-| `2025-02-01T01:23:09` | DNS query to `checkip.dyndns.org` | `10.1.31.101` | `10.1.31.1` | UDP/53 | 4/10 | Reconnaissance |
-| `2025-02-01T01:23:18` | SMTP unidirectional anomaly | `208.91.198.143` | `10.1.31.101` | TCP/587 | 6/10 | Possible C2/exfiltration |
-| `2025-02-01T01:23:12` | Telegram API TLS SNI | `10.1.31.101` | `149.154.167.220` | TCP/443 | 5/10 | High-risk IP |
-
-### **3. Threat Intelligence**
-- **High-Risk IPs**:
-  - `149.154.167.220` (Telegram) – Abuse score: **22/100** (moderate-high risk).
-  - `193.122.6.168` (Oracle Cloud) – Abuse score: **4/100** (low-moderate risk).
-- **Domains of Concern**:
-  - `checkip.dyndns.org` (reconnaissance)
-  - `api.telegram.org` (potential C2)
+**Threat Level:** **High** – Immediate containment and remediation are recommended.  
 
 ---
 
-## **Threat Assessment**
-### **1. MITRE ATT&CK Mapping**
-| Tactic | Technique | Event Example |
-|--------|-----------|---------------|
-| **Reconnaissance (TA0043)** | T1590 (Gather Victim Network Info) | DNS query to `checkip.dyndns.org` |
-| **Command & Control (TA0011)** | T1071 (Application Layer Protocol) | SMTP unidirectional traffic |
-| **Exfiltration (TA0010)** | T1048 (Exfiltration Over Protocol) | SMTP anomalies |
-| **Persistence (TA0003)** | T1133 (External Remote Services) | Telegram API connections |
+## **2. Technical Findings**  
 
-### **2. Threat Classification**
-| Threat Type | Likelihood | Impact | Notes |
-|-------------|------------|--------|-------|
-| **Reconnaissance** | High | Low | Internal host checking external IP |
-| **C2/Exfiltration** | Moderate | High | SMTP anomalies, Telegram API |
-| **Malware Delivery** | Low | Moderate | No direct evidence, but possible |
+### **A. Suricata Alerts Analysis**  
+| **Alert Type** | **Description** | **Severity** | **Affected Hosts** |
+|---------------|----------------|-------------|-------------------|
+| **ET DROP Spamhaus DROP Listed Traffic** | Traffic from a known malicious IP (`193.143.1.205`) | High | `10.2.10.101` → `193.143.1.205` |
+| **ET HUNTING WebDAV Retrieving .dll** | Suspicious `.dll` download via WebDAV | Critical | `10.2.10.101` |
+| **ET INFO Windows PowerShell User-Agent Usage** | PowerShell communicating with malicious IP | High | `10.2.10.101` → `193.143.1.205` |
+| **ET INFO PE EXE or DLL Windows File Download** | Unusual PE file download | High | `10.2.10.101` |
 
----
+### **B. Protocol & Behavioral Anomalies**  
+- **HTTP Traffic Analysis**:  
+  - Multiple `.dll` files retrieved from external IP `193.143.1.205`.  
+  - Use of WebDAV (`PROPFIND`) for file retrieval.  
+- **PowerShell Activity**:  
+  - Outbound PowerShell connections to the malicious IP.  
+- **PE File Analysis**:  
+  - Missing standard sections (e.g., `.rsrc`).  
+  - Inconsistent ASLR/DEP settings (ASLR enabled, DEP disabled).  
 
-## **Recommended Actions**
-### **Immediate Actions**
-1. **Block High-Risk IPs**:  
-   - `149.154.167.220` (Telegram C2 risk)  
-   - `208.91.198.143` (suspicious SMTP source)  
-
-2. **Investigate Internal Host (`10.1.31.101`)**:
-   - Check for malware (e.g., keyloggers, C2 beacons).
-   - Validate if SMTP services are necessary.
-
-3. **Monitor DNS Queries**:
-   - Block unnecessary dynamic DNS lookups (`checkip.dyndns.org`).
-
-### **Long-Term Mitigations**
-- **Suricata Rule Tuning** (see below).  
-- **Enable SMTP Deep Inspection** to detect exfiltration.  
-- **Implement Egress Filtering** to restrict unnecessary outbound traffic.  
+### **C. Threat Intelligence**  
+- **193.143.1.205**:  
+  - Listed in **Spamhaus DROP** (indicates malicious history).  
+  - Attempted `.dll` delivery via HTTP/WebDAV.  
 
 ---
 
-## **Suricata Rules for Prevention**
-### **1. Block Reconnaissance via DNS**
-```suricata
-alert dns $HOME_NET any -> $EXTERNAL_NET 53 (msg:"ET DYN_DNS External IP Lookup - Block"; dns.query; content:"checkip.dyndns.org"; nocase; sid:1000001; rev:1;)
-```
+## **3. Threat Assessment**  
+### **MITRE ATT&CK Mapping**  
+| **Tactic** | **Technique** | **Description** |  
+|-----------|--------------|----------------|  
+| **Initial Access** | T1071.001 (Web Protocols) | Malicious HTTP traffic |  
+| **Execution** | T1059.001 (PowerShell) | Suspicious PowerShell usage |  
+| **Persistence** | T1021.002 (WebDAV) | DLL deployment via WebDAV |  
+| **Defense Evasion** | T1140 (Deobfuscate/Decode Files) | Non-standard PE file characteristics |  
 
-### **2. Detect SMTP Anomalies**
-```suricata
-alert tcp $EXTERNAL_NET any -> $HOME_NET 587 (msg:"SMTP Unidirectional Traffic - Possible C2"; flow:to_server,no_stream; app-layer-event:smtp.unidirectional; sid:1000002; rev:1;)
-```
+### **Threat Classification**  
+- **Malware Delivery (High Confidence)**: DLL downloads and PE anomalies.  
+- **Command & Control (Medium Confidence)**: PowerShell communication with malicious IP.  
+- **Possible Lateral Movement (Low Confidence)**: WebDAV requests suggest internal propagation attempts.  
 
-### **3. Block High-Risk Telegram IPs**
-```suricata
-drop ip [149.154.167.220] any -> $HOME_NET any (msg:"Block High-Risk Telegram IP"; sid:1000003; rev:1;)
+---
+
+## **4. Recommended Actions**  
+
+### **Immediate Mitigations**  
+1. **Isolate** `10.2.10.101` – Investigate for malware infection.  
+2. **Block** `193.143.1.205` at firewall/IDS.  
+3. **Review PowerShell Script Execution Policies** – Restrict or monitor PowerShell usage.  
+4. **Scan for Malicious Files** – Check for `.dll`/`.exe` files dropped via HTTP/WebDAV.  
+
+### **Long-Term Measures**  
+- **Update Suricata Rules** (see below).  
+- **Implement WebDAV Restrictions** – Disable if not needed.  
+- **Network Segmentation** – Limit lateral movement opportunities.  
+
+---
+
+## **5. Suricata Detection Rules**  
+```yaml
+# Block Spamhaus DROP-listed IPs  
+alert ip [193.143.1.205] any -> $HOME_NET any (msg:"ET DROP Known Malicious IP (Spamhaus)"; flow:to_server; reference:url,spamhaus.org/drop; sid:1000001; rev:1;)
+
+# Detect WebDAV DLL Retrieval  
+alert http $HOME_NET any -> $EXTERNAL_NET any (msg:"ET HUNTING WebDAV DLL Download"; http.method; content:"PROPFIND"; http.uri; content:".dll"; nocase; sid:1000002; rev:1;)
+
+# Detect Suspicious PowerShell Traffic  
+alert tcp $HOME_NET any -> $EXTERNAL_NET any (msg:"ET INFO PowerShell C2 Communication"; flow:established; content:"User-Agent: PowerShell"; sid:1000003; rev:1;)
+
+# Detect PE File Downloads  
+alert http $HOME_NET any -> $EXTERNAL_NET any (msg:"ET INFO PE File Download"; http.mime_type; content:"application/x-msdownload"; sid:1000004; rev:1;)
 ```
 
 ---
 
-## **Conclusion**
-The analyzed PCAP reveals **moderate-to-high risk activity**, particularly around SMTP anomalies and connections to Telegram's infrastructure. **Immediate blocking of suspicious IPs and deeper host inspection** are recommended. Suricata rules provided will help prevent similar incidents.  
+## **Conclusion**  
+This analysis indicates a **likely compromise** of `10.2.10.101`, involving **malware delivery** and **suspicious PowerShell activity**. Immediate containment and forensic investigation are required.  
 
-**Next Steps**:  
-- Review internal host (`10.1.31.101`) for compromise.  
-- Monitor for repeated SMTP anomalies.  
-- Consider implementing **network segmentation** to limit lateral movement.  
+**Next Steps:**  
+- Conduct **host-based forensics** on `10.2.10.101`.  
+- **Monitor** for additional C2 traffic.  
+- **Update security policies** to prevent recurrence.  
 
----
-**Report Generated By**: AI Security Analyst  
-**Date**: 2025-02-01
+**End of Report**
