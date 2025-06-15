@@ -24,13 +24,22 @@ from langchain_core.messages import BaseMessage
 import time
 import asyncio
 from diskcache import Cache
-from config.settings import PCAP_FILE, SURICATA_DOCS_URL , CHUTES_API_BASE , CHUTES_API_KEY , SURICATA_FAST_LOG , ZEEK_CONN_LOG , SURICATA_CONFIG, SURICATA_OUTPUT_DIR, SURICATA_RULES_DIR, ABUSEIPDB_API_KEY, VIRUSTOTAL_API_KEY, GRAPH_OUTPUT_DIR
+#import mermaid
+from IPython.display import Image
+
+from config.settings import PCAP_FILE, SURICATA_DOCS_URL , CHUTES_API_BASE , CHUTES_API_KEY , SURICATA_FAST_LOG , ZEEK_CONN_LOG , SURICATA_CONFIG, SURICATA_OUTPUT_DIR, SURICATA_RULES_DIR, ABUSEIPDB_API_KEY, VIRUSTOTAL_API_KEY, GRAPH_OUTPUT_DIR , ZEEK_OUTPUT_DIR
+import shutil
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 os.environ["USER_AGENT"] = "CynsesAI-PCAP-Analyzer/1.0"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 # Initialize diskcache Cache
-cache = Cache("./cache_dir")
+
+#cache = Cache("./cache_dir")
 
 # Configuration
 USE_OLLAMA = False  # Set to False for API-based LLM
@@ -85,7 +94,7 @@ def setup_suricata_rag() -> Chroma:
 # Initialize RAG vector store
 suricata_vectorstore = setup_suricata_rag()
 
-@cache.memoize()
+#@cache.memoize()
 def retrieve_suricata_docs(query: str) -> str:
     """Retrieve relevant Suricata documentation"""
     docs = suricata_vectorstore.similarity_search(query, k=3)
@@ -94,9 +103,46 @@ def retrieve_suricata_docs(query: str) -> str:
 # ------------------------
 # LangGraph Node Functions
 # ------------------------
+def cleanup_resources(additional_paths: List[str] = None):
+    """
+    Clean up analysis resources including:
+    - Suricata output
+    - Zeek logs
+    - Generated graphs
+    - Cache directory
+    - Any additional specified paths
+    
+    Args:
+        additional_paths: List of additional paths to clean up
+    """
+    paths_to_clean = [
+        #SURICATA_OUTPUT_DIR,
+        ZEEK_OUTPUT_DIR,
+        "attack_graphs",
+        GRAPH_OUTPUT_DIR,
+        #"./cache_dir",
+        "__pycache__" , # DiskCache directory
+        *([] if additional_paths is None else additional_paths)
+    ]
+    
+    for path in paths_to_clean:
+        try:
+            path_obj = Path(path)
+            if path_obj.exists():
+                if path_obj.is_dir():
+                    shutil.rmtree(path_obj)
+                    logger.info(f"Successfully removed directory: {path}")
+                else:
+                    path_obj.unlink()
+                    logger.info(f"Successfully removed file: {path}")
+        except Exception as e:
+            logger.error(f"Failed to remove {path}: {str(e)}")
 
 def initialize_analysis(state: AnalysisState) -> Dict:
     """Node 1: Initialize analysis"""
+    cleanup_resources()
+    #global cache
+    #cache = Cache("./cache_dir")  # Re-initialize after cleanup
     print("🚀 Starting PCAP analysis workflow")
     return {
         "pcap_path": state["pcap_path"],
@@ -164,6 +210,77 @@ def ask_run_classifier() -> bool:
             print("Please enter 'y' or 'n'.")
 
 
+
+def generate_attack_diagram(state: AnalysisState) -> str:
+    """Generate Mermaid diagram code based on detected attack patterns"""
+    # Extract key entities from analysis
+    internal_ips = set()
+    external_ips = set()
+    relationships = []
+    
+    # Process Suricata events
+    for event in state.get('suricata_events', []):
+        src_ip = event.get('src_ip')
+        dest_ip = event.get('dest_ip')
+        if src_ip and dest_ip:
+            if src_ip.startswith('10.') or src_ip.startswith('192.168.'):
+                internal_ips.add(src_ip)
+                external_ips.add(dest_ip)
+                relationships.append(f"{src_ip} -->|{event.get('event_type','Alert')}| {dest_ip}")
+            elif dest_ip.startswith('10.') or dest_ip.startswith('192.168.'):
+                internal_ips.add(dest_ip)
+                external_ips.add(src_ip)
+                relationships.append(f"{src_ip} -->|{event.get('event_type','Alert')}| {dest_ip}")
+    
+    # Process Zeek logs
+    conn_log = state.get('zeek_logs', {}).get('conn.log', [])
+    for line in conn_log[:50]:  # Sample first 50 connections
+        parts = line.split('\t')
+        if len(parts) > 5:
+            src_ip, dest_ip = parts[2], parts[4]
+            if src_ip and dest_ip:
+                relationships.append(f"{src_ip} -->|Connection| {dest_ip}")
+    
+    # Build Mermaid diagram
+    diagram = ["graph LR"]
+    for ip in internal_ips:
+        diagram.append(f"    I{ip.replace('.','_')}[Internal Host\\n{ip}]")
+    for ip in external_ips:
+        diagram.append(f"    E{ip.replace('.','_')}[External Server\\n{ip}]")
+    for relation in set(relationships):  # Deduplicate
+        diagram.append(f"    {relation}")
+    
+    return "\n".join(diagram)
+
+def render_diagram(diagram_code: str) -> str:
+    """Render Mermaid diagram to image file using mermaid-cli"""
+    try:
+        # Create a temporary file for the Mermaid code
+        temp_mmd_file = Path("temp_diagram.mmd")
+        temp_mmd_file.write_text(diagram_code)
+
+        # Output image path
+        img_path = "attack_flow.png"
+
+        # Run mermaid-cli to generate the image
+        subprocess.run([
+            "mmdc",
+            "-i", str(temp_mmd_file),
+            "-o", img_path,
+            "-t", "dark",
+            "-w", "1200"
+        ], check=True)
+
+        # Remove the temporary Mermaid file
+        temp_mmd_file.unlink()
+
+        return img_path
+    except subprocess.CalledProcessError as e:
+        print(f"⚠️ Diagram rendering failed: {e}")
+        return ""
+    except Exception as e:
+        print(f"⚠️ Unexpected error during diagram rendering: {e}")
+        return ""
 #def protocol_analysis_node(state: AnalysisState) -> Dict:
     """Node 4: Perform protocol analysis"""
     print("📡 Analyzing network protocols...")
@@ -432,9 +549,13 @@ def summarize_anomalies(anomalies: list):
     
 
 def report_generation_node(state: AnalysisState) -> Dict:
-    """Node 8: Generate final report with error handling and retries"""
-    print("📝 Generating comprehensive report...")
-
+    """Node 8: Generate final report with attack diagrams"""
+    print("📝 Generating comprehensive report with attack diagrams...")
+    
+    # Generate attack diagram
+    diagram_code = generate_attack_diagram(state)
+    diagram_path = render_diagram(diagram_code) if diagram_code else ""
+    
     # Safely summarize inputs
     suricata_events = state.get('suricata_events') or []
     protocol_analysis_dict = state.get('protocol_analysis') or {}
@@ -442,8 +563,8 @@ def report_generation_node(state: AnalysisState) -> Dict:
     anomalies_list = state.get('anomalies') or []
     visualization_data = state.get('visualization_data') or {}
     rag_context_val = state.get('rag_context') or ""
-
-    # Generate summaries with safe defaults
+    
+    # Generate summaries
     suricata_summary = summarize_suricata_events(suricata_events[:3000])
     protocol_analysis = extract_content(protocol_analysis_dict.get('llm_analysis', ''))[:1000]
     threat_intel_analysis = extract_content(threat_intel_dict.get('llm_analysis', ''))[:1000]
@@ -456,45 +577,59 @@ def report_generation_node(state: AnalysisState) -> Dict:
         else "No traffic classification data available."
     )
     graph_image = visualization_data.get('graph_image', None)
-
-    # Build markdown-compatible image reference
-    image_section = ""
+    
+    # Build markdown image references
+    image_sections = []
+    if diagram_path and os.path.exists(diagram_path):
+        image_sections.append(f"\n\n![Attack Flow Diagram](./{diagram_path})\n")
     if graph_image and os.path.exists(graph_image):
-        image_section = f"\n\n![Attack Graph](./{graph_image})\n"
-
+        image_sections.append(f"\n\n![Network Attack Graph](./{graph_image})\n")
+        
+    # Prepare diagram code for report
+    diagram_section = ""
+    if diagram_code:
+        diagram_section = (
+            "\n\n### Attack Flow Diagram\n"
+            "```mermaid\n"
+            f"{diagram_code}\n"
+            "```\n"
+        )
+    
     prompt = f"""
     Create a comprehensive security report for PCAP analysis:
-
     Visualization Summary:
-    {visualization_plan}{image_section}
-
+    {visualization_plan}{''.join(image_sections)}
+    
+    {diagram_section}
+    
     Suricata Events Summary:
     {suricata_summary}
-
+    
     Protocol Analysis:
     {protocol_analysis}
-
+    
     Traffic Classification Summary:
     {traffic_classification}
-
+    
     Threat Intelligence:
     {threat_intel_analysis}
-
+    
     Anomalies Detected:
     {anomalies}
-
-    Structure the report with:
-    - Executive Summary
-    - Technical Findings
-    - Threat Assessment
-    - Recommended Actions
-    - Mitre ATT&CK Mapping 
-    - Threat Classification
-
-    At the end, provide Suricata rules to prevent similar attacks.
+    
+    Structure the report with these sections:
+    1. Executive Summary
+    2. Technical Findings
+      - Include the Mermaid diagram code block
+    3. Attack Flow Analysis
+    4. Threat Assessment
+    5. Recommended Actions
+    6. Mitre ATT&CK Mapping
+    7. Threat Classification
+    
+    Include Suricata rules to prevent similar attacks
     """
-
-    # Implement retry logic with exponential backoff
+        # Implement retry logic with exponential backoff
     max_retries = 3
     retry_delay = 5  # seconds
     report = "⚠️ Error: Full report could not be generated."
@@ -523,7 +658,7 @@ def report_generation_node(state: AnalysisState) -> Dict:
                 - Threat Indicators: {len(threat_intel_dict.get('matches', []))}
                 
                 ## Visualization
-                {image_section}
+                {''.join(image_sections)}
                 
                 ## Next Steps
                 Please retry later for full analysis details or contact support.
@@ -531,7 +666,9 @@ def report_generation_node(state: AnalysisState) -> Dict:
     
     return {
         "report": report,
-        "status": "complete" if not report.startswith("⚠️") else "partial"
+        "status": "complete" if not report.startswith("⚠️") else "partial",
+        "diagram_code": diagram_code,
+        "diagram_image": diagram_path
     }
 # ------------------------
 # Build the LangGraph
@@ -600,6 +737,126 @@ def run_analysis(pcap_path: str):
     print(results["report"][:2000] + "...")
     print(f"\nFull report saved to pcap_analysis_report.md")
 
+def summarize_state_for_gpt(state: AnalysisState) -> str:
+    """
+    Extract and summarize key info from the analysis state to provide context.
+    Includes all nodes from the analysis graph.
+    """
+    if not isinstance(state, dict):
+        return "⚠️ No analysis state available."
+
+    summary = []
+
+    # Suricata Events
+    summary.append("## Suricata Alerts\n")
+    summary.append(summarize_suricata_events(state.get("suricata_events", []))[:2000])
+
+    # Zeek Logs
+    summary.append("\n## Zeek Logs\n")
+    zeek_logs = state.get("zeek_logs", {})
+    if zeek_logs:
+        for log_name, lines in zeek_logs.items():
+            summary.append(f"### {log_name}\n")
+            summary.append("\n".join(lines[:5])[:1000])
+    else:
+        summary.append("No Zeek logs available.")
+
+    # Protocol Analysis
+    summary.append("\n## Protocol Analysis\n")
+    protocol_analysis = state.get("protocol_analysis", {})
+    if protocol_analysis:
+        llm_analysis = protocol_analysis.get("llm_analysis", "")
+        summary.append(f"LLM Analysis: {extract_content(llm_analysis)[:1000]}")
+        summary.append(f"\nRaw: {json.dumps(protocol_analysis.get('raw', {}), indent=2)[:1000]}")
+    else:
+        summary.append("No protocol analysis available.")
+
+    # Threat Intelligence
+    summary.append("\n## Threat Intelligence\n")
+    threat_intel = state.get("threat_intel", {})
+    if threat_intel:
+        llm_analysis = threat_intel.get("llm_analysis", "")
+        summary.append(f"LLM Analysis: {extract_content(llm_analysis)[:1000]}")
+        summary.append(f"\nRaw: {json.dumps(threat_intel.get('raw', {}), indent=2)[:1000]}")
+    else:
+        summary.append("No threat intelligence available.")
+
+    # Anomalies
+    summary.append("\n## Anomalies\n")
+    anomalies = state.get("anomalies", [])
+    summary.append(summarize_anomalies(anomalies)[:2000])
+
+    # Visualization
+    summary.append("\n## Visualization\n")
+    visualization = state.get("visualization_data", {})
+    if visualization:
+        summary.append(visualization.get("plan", "")[:1000])
+        summary.append(f"Graph Image: {visualization.get('graph_image', 'N/A')}")
+        summary.append(f"Graph HTML: {visualization.get('graph_html', 'N/A')}")
+    else:
+        summary.append("No visualization data available.")
+
+    # Traffic Classification
+    summary.append("\n## Traffic Classification\n")
+    traffic_classification = state.get("traffic_classification", {})
+    if traffic_classification:
+        summary.append(json.dumps(traffic_classification, indent=2)[:1000])
+    else:
+        summary.append("No traffic classification data available.")
+
+    # Report
+    summary.append("\n## Report Summary\n")
+    summary.append(str(state.get("report", ""))[:2000])
+
+    # RAG Context
+    summary.append("\n## RAG Context\n")
+    summary.append(str(state.get("rag_context", ""))[:1000])
+
+    return "\n".join(summary)
+def build_prompt(history: list, context: str, user_input: str) -> str:
+    """
+    Build a prompt string combining conversation history, context, and current user input.
+    """
+    prompt = context + "\n\n"
+    for turn in history:
+        prompt += f"User: {turn['user']}\nAssistant: {turn['assistant']}\n"
+    prompt += f"User: {user_input}\nAssistant:"
+    return prompt
+
+def interactive_gpt_session(final_state: AnalysisState):
+    """
+    Allow user to interact with GPT about the analysis results.
+    """
+    conversation_history = []
+    print("You can now ask questions about the analysis. Type 'exit' to quit.")
+    
+    while True:
+        user_input = input("Your question: ")
+        if user_input.lower() in ("exit", "quit"):
+            print("Exiting interactive session.")
+            break
+        
+        # Prepare context from final_state (summarize or serialize relevant parts)
+        context = summarize_state_for_gpt(final_state)
+        
+        # Combine conversation history + context + user input
+        prompt = build_prompt(conversation_history, context, user_input)
+        
+        # Query the LLM (use the same llm instance as in your workflow)
+        try:
+            response = llm.invoke(prompt)
+            if hasattr(response, "content"):
+                response_text = response.content
+            else:
+                response_text = str(response)
+        except Exception as e:
+            response_text = f"Error from LLM: {e}"
+        
+        # Print and save response
+        print("GPT:", response_text)
+        conversation_history.append({"user": user_input, "assistant": response_text})
+
 # Run the analysis
 if __name__ == "__main__":
-    run_analysis(PCAP_FILE)
+    final_state = run_analysis(PCAP_FILE)
+    interactive_gpt_session(final_state)
