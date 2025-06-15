@@ -5,9 +5,9 @@ import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from config.settings import ABUSEIPDB_API_KEY, VIRUSTOTAL_API_KEY
-cache = Cache("./cache_dir")
+#cache = Cache("./cache_dir")
 
-@cache.memoize()
+#@cache.memoize()
 def real_threat_intel(ip: str) -> dict:
     def query_abuseipdb(ip: str) -> dict:
         url = f"https://api.abuseipdb.com/api/v2/check?ipAddress={ip}"
