@@ -7,9 +7,9 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from config.settings import SURICATA_CONFIG, PCAP_FILE
 # Initialize diskcache
-cache = Cache("./cache_dir")
+#cache = Cache("./cache_dir")
 
-@cache.memoize()
+#@cache.memoize()
 def run_suricata(pcap_path: str) -> list:
     """Run Suricata on PCAP file and parse results"""
     output_dir = "suricata_output"
