@@ -11,17 +11,17 @@ import numpy as np
 import pandas as pd
 from plotly.subplots import make_subplots
 import ipaddress
-
+from config.settings import ABUSEIPDB_API_KEY , PCAP_FILE , SURICATA_FAST_LOG , ZEEK_CONN_LOG  , GRAPH_OUTPUT_DIR # Ensure this is set in your settings
 # --------------------------
 # Configuration
 # --------------------------
-PCAP_PATH = "/Users/macbook/Desktop/CynsesAI/sample.pcap"
-SURICATA_FAST_LOG = "/Users/macbook/Desktop/CynsesAI/suricata_output/fast.log"
-ZEEK_CONN_LOG = "/Users/macbook/Desktop/CynsesAI/zeek_output/conn.log"
-OUTPUT_DIR = "attack_graphs"
-THREAT_API_KEY = "99b0c8552352c73ac74739cf496a06d8e006ff2353d6b21d5d9a6e07f616f3d9dcc507b1eade1cca"
+#PCAP_PATH = "/Users/macbook/Desktop/CynsesAI/sample.pcap"
+#SURICATA_FAST_LOG = "/Users/macbook/Desktop/CynsesAI/suricata_output/fast.log"
+#ZEEK_CONN_LOG = "/Users/macbook/Desktop/CynsesAI/zeek_output/conn.log"
+#OUTPUT_DIR = "attack_graphs"
+#THREAT_API_KEY = "99b0c8552352c73ac74739cf496a06d8e006ff2353d6b21d5d9a6e07f616f3d9dcc507b1eade1cca"
 
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+os.makedirs(GRAPH_OUTPUT_DIR, exist_ok=True)
 
 # --------------------------
 # Enhanced Helper Functions
@@ -144,35 +144,26 @@ def extract_packet_data_with_scapy(pcap_path: str) -> List[Dict]:
     return flows
 
 def get_threat_score(ip: str) -> int:
-    """Enhanced threat intelligence with caching and mock data"""
+    """Enhanced threat intelligence with caching and real data only"""
     # Private IP check
-    if ipaddress.ip_address(ip).is_private:
-        return 0
-    
-    # Mock data for demonstration (remove in production)
-    mock_scores = {
-        "192.168.1.100": 0,
-        "10.0.0.5": 0,
-        "93.184.216.34": 85,  # example.com
-        "142.250.185.206": 30,  # google.com
-        "185.199.108.154": 75,  # github.com
-        "malicious.example": 95
-    }
-    
-    if ip in mock_scores:
-        return min(mock_scores[ip] // 20, 5)
-    
+    try:
+        if ipaddress.ip_address(ip).is_private:
+            return 0
+    except Exception:
+        return 0  # Not a valid IP
+
     # Real API call
     url = f"https://api.abuseipdb.com/api/v2/check?ipAddress={ip}"
-    headers = {"Key": THREAT_API_KEY, "Accept": "application/json"}
-    
+    headers = {"Key": ABUSEIPDB_API_KEY, "Accept": "application/json"}
+
     try:
         response = requests.get(url, headers=headers, timeout=5)
         if response.status_code == 200:
-            return min(int(response.json()['data']['abuseConfidenceScore'] // 20), 5)
+            score = int(response.json()['data']['abuseConfidenceScore'])
+            return min(score // 20, 5)
     except Exception as e:
         print(f"Threat lookup failed for {ip}: {str(e)}")
-    
+
     return 0
 
 # --------------------------
@@ -309,7 +300,7 @@ def generate_networkx_plot(G, filename="attack_graph.png"):
                "Red Edges: Security Alerts | Blue Edges: Network Connections | Purple Edges: Packet Flows",
                ha="center", fontsize=10)
     plt.tight_layout()
-    plt.savefig(os.path.join(OUTPUT_DIR, filename), dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(GRAPH_OUTPUT_DIR, filename), dpi=300, bbox_inches='tight')
     plt.close()
     print(f"[+] NetworkX attack graph saved to {filename}")
 
@@ -455,7 +446,7 @@ def generate_plotly_interactive(G, filename="interactive_attack_graph.html"):
         font=dict(size=12)
     )
     
-    fig.write_html(os.path.join(OUTPUT_DIR, filename))
+    fig.write_html(os.path.join(GRAPH_OUTPUT_DIR, filename))
     print(f"[+] Interactive Plotly graph saved to {filename}")
 
 def generate_summary_report(alerts, connections, packets, filename="attack_summary.html"):
@@ -544,7 +535,7 @@ def generate_summary_report(alerts, connections, packets, filename="attack_summa
     )
     
     # Save report
-    fig.write_html(os.path.join(OUTPUT_DIR, filename))
+    fig.write_html(os.path.join(GRAPH_OUTPUT_DIR, filename))
     print(f"[+] Summary report saved to {filename}")
 
 # --------------------------
@@ -555,7 +546,7 @@ if __name__ == "__main__":
     print("[+] Parsing security data...")
     suricata_alerts = parse_suricata_fast_log(SURICATA_FAST_LOG)
     zeek_connections = parse_zeek_conn_log(ZEEK_CONN_LOG)
-    packet_flows = extract_packet_data_with_scapy(PCAP_PATH)
+    packet_flows = extract_packet_data_with_scapy(PCAP_FILE)
     
     print(f"[+] Loaded: {len(suricata_alerts)} alerts, {len(zeek_connections)} connections, {len(packet_flows)} packets")
     
@@ -577,4 +568,4 @@ if __name__ == "__main__":
     )
     
     print("[+] All visualizations generated successfully!")
-    print(f"[+] Output directory: {os.path.abspath(OUTPUT_DIR)}")
+    print(f"[+] Output directory: {os.path.abspath(GRAPH_OUTPUT_DIR)}")
