@@ -1,5 +1,8 @@
 from langchain_openai import ChatOpenAI
 from typing import Dict, List
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from config.settings import CHUTES_API_KEY, CHUTES_API_BASE
 
 def analyze_protocols(logs: Dict[str, List[str]], rag_context: str) -> dict:
