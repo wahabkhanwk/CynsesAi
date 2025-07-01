@@ -854,7 +854,6 @@ def interactive_gpt_session(final_state: AnalysisState):
         
         # Print and save response
         print("GPT:", response_text)
-        print("GPT:", response_text)
         conversation_history.append({"user": user_input, "assistant": response_text})
 
 # Run the analysis
