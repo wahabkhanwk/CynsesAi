@@ -131,4 +131,4 @@ Contributions are welcome! Please feel free to fork the repository, make your ch
 
 ## License
 
-Distributed under the MIT License. See `LICENSE` file for more information.
+Distributed under the MIT License. See `LICENSE` file for more information..
